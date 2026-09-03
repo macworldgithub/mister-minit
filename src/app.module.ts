@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CdrModule } from './cdr/cdr.module';
+import { ChatbotModule } from './chatbot/chatbot.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { CdrModule } from './cdr/cdr.module';
       inject: [ConfigService],
     }),
     CdrModule,
+    ChatbotModule,
   ],
   controllers: [AppController],
   providers: [AppService],

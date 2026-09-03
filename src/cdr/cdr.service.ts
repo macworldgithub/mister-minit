@@ -14,7 +14,7 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
 
       socket.on('data', (data) => {
         buffer += data.toString();
-        
+
         // Process data line by line if multiple records arrive
         let newlineIndex;
         while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
@@ -37,8 +37,8 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
       this.logger.error(`Server error: ${err.message}`, err.stack);
     });
 
-    this.server.listen(3000, () => {
-      this.logger.log('CDR TCP server listening on port 3000');
+    this.server.listen(4005, () => {
+      this.logger.log('CDR TCP server listening on port 4005');
     });
   }
 
@@ -55,7 +55,7 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
 
     // Expected format: callid, duration, time-start, time-answered, time-end, reason-terminated, from-no, from-dn, dial-no
     const fields = rawData.split(',');
-    
+
     if (fields.length < 9) {
       this.logger.warn(`Received malformed CDR data: ${rawData}`);
       return;
@@ -91,7 +91,7 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
 
   private async triggerMissedCallSMS(customerNumber: string, storeDID: string) {
     this.logger.log(`[SMS TRIGGER] Missed call detected! From: ${customerNumber}, To: ${storeDID}`);
-    
+
     // Placeholder logic for triggering SMS
     // Example: await this.smsService.sendMissedCallSMS(customerNumber, storeDID);
   }

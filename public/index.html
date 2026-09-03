@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Mister Minit SMS Simulator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f4f4f9;
+        }
+
+        #chat-box {
+            height: 400px;
+            border: 1px solid #ccc;
+            background: #fff;
+            padding: 15px;
+            overflow-y: scroll;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            max-width: 80%;
+        }
+
+        .user {
+            background: #dcf8c6;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .bot {
+            background: #e1effc;
+            margin-right: auto;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+
+        input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>Mister Minit SMS Simulator (Missed-Call Flow)</h2>
+    
+    <div style="margin-bottom: 15px; display: flex; gap: 10px;">
+        <select id="store-selector" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc; flex: 1;">
+            <option value="0872286100">Marion (0872286100)</option>
+            <option value="09821200012062">Enex Pert (09821200012062)</option>
+            <option value="61892260988">Enex Pert (61892260988)</option>
+            <option value="61370360442">Traralgon (61370360442)</option>
+            <option value="09821200012620">Traralgon (09821200012620)</option>
+            <option value="0370360236">Tok H (0370360236)</option>
+            <option value="0863652926">Dianella (0863652926)</option>
+            <option value="0861868180">The Mezz (0861868180)</option>
+            <option value="0738214854">Cleveland (0738214854)</option>
+        </select>
+        <button onclick="triggerMissedCallFlow()" style="background: #28a745;">Simulate Missed Call</button>
+    </div>
+
+    <div id="chat-box"></div>
+
+    <div class="input-area">
+        <input type="text" id="message-input" placeholder="Type your reply as the customer..."
+            onkeypress="handleKey(event)">
+        <button onclick="sendCustomerReply()">Send Reply</button>
+    </div>
+
+    <script>
+        const customerNumber = "+61400000999";
+
+        // The moment the page opens, simulate the missed call firing our proactive first text
+        window.onload = function () {
+            triggerMissedCallFlow();
+        };
+
+        async function triggerMissedCallFlow() {
+            // Clear existing chat memory on UI
+            document.getElementById('chat-box').innerHTML = '';
+            
+            const storeDID = document.getElementById('store-selector').value;
+
+            try {
+                // Call the backend to initiate chat and get the dynamic greeting
+                const response = await fetch('http://localhost:3005/sms/initiate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ from: customerNumber, storeDID: storeDID })
+                });
+                
+                const data = await response.json();
+                const initialGreeting = data.greeting || "Hi, thanks for calling! Sorry we missed your call.";
+                
+                // Show it on screen as our message to the customer
+                appendMessage(initialGreeting, "bot");
+            } catch (error) {
+                appendMessage("Error initiating chat with backend.", "bot");
+            }
+        }
+
+        async function sendCustomerReply() {
+            const input = document.getElementById('message-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            // Show customer's reply on screen
+            appendMessage(text, "user");
+            input.value = "";
+
+            // Send it to your NestJS webhook
+            try {
+                const response = await fetch('http://localhost:3005/sms/webhook', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ from: customerNumber, text: text })
+                });
+
+                const data = await response.json();
+                // Show the AI's response back to the customer
+                appendMessage(data.reply || "AI processed your message.", "bot");
+            } catch (error) {
+                appendMessage("Error connecting to NestJS backend.", "bot");
+            }
+        }
+
+        function appendMessage(text, sender) {
+            const chatBox = document.getElementById('chat-box');
+            const div = document.createElement('div');
+            div.className = `message ${sender}`;
+            div.innerText = text;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function handleKey(e) {
+            if (e.key === 'Enter') sendCustomerReply();
+        }
+    </script>
+</body>
+
+</html>
