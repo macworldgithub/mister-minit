@@ -1,0 +1,120 @@
+# MISTER MINIT — STORE CONFIGURATION TEMPLATE
+# Pilot Stores (6 to be confirmed at kick-off)
+# Complete one block per pilot store
+
+---
+
+## STORE TEMPLATE
+
+```json
+{
+  "store_id": "STORE_001",
+  "store_name": "Mister Minit [STORE NAME]",
+  "short_name": "[STORE NAME]",
+  "did_primary": "02XXXXXXXX",
+  "did_extension_groups": ["GRP000X"],
+  "queue_extensions": {
+    "key_remotes": "10X5",
+    "engraving": "10X6",
+    "shoe_repair": "10X7",
+    "watch": "10X8",
+    "others": "10X9"
+  },
+  "address": {
+    "shop_number": "Shop XX",
+    "centre": "[SHOPPING CENTRE NAME]",
+    "street": "[STREET ADDRESS]",
+    "suburb": "[SUBURB]",
+    "state": "[STATE]",
+    "postcode": "XXXX"
+  },
+  "trading_hours": {
+    "monday": "9:00am - 5:30pm",
+    "tuesday": "9:00am - 5:30pm",
+    "wednesday": "9:00am - 5:30pm",
+    "thursday": "9:00am - 9:00pm",
+    "friday": "9:00am - 5:30pm",
+    "saturday": "9:00am - 5:00pm",
+    "sunday": "10:00am - 5:00pm",
+    "public_holidays": "Closed"
+  },
+  "staff_notifications": {
+    "primary_contact_name": "[STORE MANAGER NAME]",
+    "primary_contact_mobile": "04XXXXXXXX",
+    "primary_contact_email": "store@misterminit.com.au",
+    "backup_contact_name": "[BACKUP CONTACT]",
+    "backup_contact_mobile": "04XXXXXXXX"
+  },
+  "sms_sender_id": "MisterMinit",
+  "greeting_override": null,
+  "special_notes": ""
+}
+```
+
+---
+
+## KNOWN STORES FROM CALL DATA (Network Reference)
+
+| # | Store | DID | Abbrev | Est. Monthly Calls | Abandon Rate |
+|---|---|---|---|---|---|
+| 1 | Blacktown | 0290528847 | B | ~545 | 5.7% |
+| 2 | Shellharbour | 0242963444 | SH | ~429 | 10.0% |
+| 3 | Werribee | 0397489210 | W | ~419 | 13.6% |
+| 4 | Caroline Springs | 0383485364 | CS | ~404 | 16.1% |
+| 5 | Macquarie Centre | 0298782209 | M | ~396 | 13.1% |
+| 6 | Top Ryde | 0291884123 | R | ~333 | 20.7% |
+| 7 | Stanhope Garden | 0296299719 | S | ~320 | 5.9% |
+| 8 | Orange | 0263611448 | O | ~302 | 30.8% |
+| 9 | Woodgrove | 0397436744 | Wg | ~288 | 19.8% |
+| 10 | Dapto | 0242612294 | D | ~274 | 16.1% |
+| 11 | Point Cook | 0393956166 | PC | ~258 | 22.1% |
+| 12 | **Oran Park** | 0282013084 | OP | ~247 | **72.9%** |
+| 13 | Southgate | 0285204005 | SG | ~217 | 31.8% |
+| 14 | Seven Hills | 0291888538 | 7H | ~163 | 18.4% |
+| 15 | Geelong | 0352227098 | G | ~285 | ~15% |
+
+> **Recommended pilot priority:** Oran Park (OP), Orange (O), Southgate (SG), Top Ryde (R), Point Cook (PC), Caroline Springs (CS) — these have the highest abandon rates and therefore the greatest SMS recovery potential.
+
+---
+
+## DATA REQUIRED FROM CLIENT (per store, within 48 hours of kick-off)
+
+Per the Assumptions & Dependencies in the Scope of Work:
+
+- [ ] Confirmed DID / extension for each pilot store
+- [ ] Confirmed store name and address
+- [ ] Trading hours (may differ from standard pattern above)
+- [ ] Primary staff notification mobile number
+- [ ] Backup/secondary notification contact
+- [ ] Preferred notification method (SMS / email / both)
+- [ ] Any store-specific pricing overrides or notes
+- [ ] Any specific greeting language preferences
+
+---
+
+## 3CX EXTENSION PATTERN (observed from call data)
+
+```
+Store prefix examples:
+  Top Ryde (R):         10X1 (main), GRP0001, queues 1005–1009
+  Macquarie Centre (M): 10X1 (main), GRP0002, queues 1015–1019
+  Blacktown (B):        10X1 (main), GRP0003, queues 1025–1029
+  Stanhope (S):         10X1 (main), GRP0004, queues 1035–1039
+  Werribee (W):         10X1 (main), GRP0006, queues 1055–1059
+  Woodgrove (Wg):       10X1 (main), GRP0007, queues 1065–1069
+  Caroline Springs (CS):10X1 (main), GRP0008, queues 1075–1079
+  Point Cook (PC):      10X1 (main), GRP0009, queues 1085–1089
+  Shellharbour (SH):    10X1 (main), GRP0010, queues 1095–1099
+  Dapto (D):            10X1 (main), GRP0011, queues 1105–1109
+  Southgate (SG):       10X1 (main), GRP0013, queues 1125–1129
+  Seven Hills (7H):     10X1 (main), GRP0014, queues 1135–1139
+  Orange (O):           10X1 (main), GRP0015, queues 1145–1149
+  Oran Park (OP):       10X1 (main), GRP0016, queues 1155–1159
+
+Queue suffix pattern per store:
+  X5 = Key and Remotes
+  X6 = Engraving
+  X7 = Shoe Repair
+  X8 = Watch
+  X9 = Others / General
+```
