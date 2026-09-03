@@ -2,7 +2,7 @@
 # Pilot Stores (6 to be confirmed at kick-off)
 # Complete one block per pilot store
 
----
+
 
 ## STORE TEMPLATE
 
@@ -51,12 +51,12 @@
 }
 ```
 
----
+
 
 ## KNOWN STORES FROM CALL DATA (Network Reference)
 
 | # | Store | DID | Abbrev | Est. Monthly Calls | Abandon Rate |
-|---|---|---|---|---|---|
+|||||||
 | 1 | Blacktown | 0290528847 | B | ~545 | 5.7% |
 | 2 | Shellharbour | 0242963444 | SH | ~429 | 10.0% |
 | 3 | Werribee | 0397489210 | W | ~419 | 13.6% |
@@ -75,7 +75,7 @@
 
 > **Recommended pilot priority:** Oran Park (OP), Orange (O), Southgate (SG), Top Ryde (R), Point Cook (PC), Caroline Springs (CS) — these have the highest abandon rates and therefore the greatest SMS recovery potential.
 
----
+
 
 ## DATA REQUIRED FROM CLIENT (per store, within 48 hours of kick-off)
 
@@ -90,7 +90,7 @@ Per the Assumptions & Dependencies in the Scope of Work:
 - [ ] Any store-specific pricing overrides or notes
 - [ ] Any specific greeting language preferences
 
----
+
 
 ## 3CX EXTENSION PATTERN (observed from call data)
 

@@ -48,7 +48,7 @@
 Pilot stores are to be confirmed at kick-off. Standard trading hours are typical and must be confirmed per store.
 
 | Store | Phone DID | Code |
-| :--- | :--- | :--- |
+| : | : | : |
 | Blacktown | 0290528847 | B |
 | Macquarie Centre | 0298782209 | M |
 | Top Ryde | 0291884123 | R |
@@ -108,7 +108,7 @@ Pilot stores are to be confirmed at kick-off. Standard trading hours are typical
 **Indicative pricing**
 
 | Service | Price |
-| :--- | :--- |
+| : | : |
 | Basic non-button blade only | from $20–$40 |
 | Standard non-button key, cut + program | from $120–$130 |
 | Flip key with remote, cut + program | from $200 |
@@ -313,7 +313,7 @@ Toyota, Hyundai, Ford, Mazda, Subaru, Honda, Nissan, Volkswagen, Commodore / Hol
 **"How long will it take?"**
 
 | Service | Typical time |
-| :--- | :--- |
+| : | : |
 | Key cutting | ~2 minutes |
 | Watch battery | 15–30 minutes |
 | Car key programming | ~20 minutes |
@@ -367,7 +367,7 @@ Conversation summary: [BRIEF SUMMARY]
 ## 14. OUT-OF-SCOPE SERVICES
 
 | Customer request | Response / referral |
-| :--- | :--- |
+| : | : |
 | Luggage zipper repair | Not offered; refer to specialist leather/luggage repairer |
 | Arch support / orthotics | Not offered; refer to podiatrist or specialist cobbler |
 | Wall/Grandfather clock servicing | Not offered; refer to watchmaker or jeweller |

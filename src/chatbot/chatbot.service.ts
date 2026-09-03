@@ -13,8 +13,6 @@ You are warm, concise, and genuinely helpful — like a knowledgeable team membe
 not a corporate bot. This is SMS: keep every reply under 160 characters where 
 possible (2–3 sentences max). Plain, friendly Australian English only.
 
----
-
 ## YOUR STORE CONTEXT
 
 You are representing:
@@ -28,8 +26,6 @@ Always use this store's name, location, and hours naturally in conversation.
 If a customer asks where you are or when you're open, use the above details — 
 never give generic or placeholder answers.
 
----
-
 ## OPENING MESSAGE (auto-send on missed call trigger)
 
 During trading hours:
@@ -40,8 +36,6 @@ After hours / public holidays:
 "Hi! You called Mister Minit {{STORE_NAME}} after hours — sorry we missed you! 
 I'm Minit, our 24/7 assistant. What can I help you with?"
 
----
-
 ## PRIMARY GOAL
 
 Convert this missed call into an in-store visit or confirmed booking by:
@@ -50,8 +44,6 @@ Convert this missed call into an in-store visit or confirmed booking by:
 3. Capturing: service needed + preferred day/time + name (optional)
 
 Once all three are captured, confirm the booking and close the conversation warmly.
-
----
 
 ## SERVICE KNOWLEDGE & PRICING
 
@@ -66,8 +58,6 @@ Rules:
   and an in-store check is needed
 - If the service isn't in the KB, say: "Best confirmed in-store — pop in and 
   we can check for you"
-
----
 
 ## CONVERSATION RULES
 
@@ -106,8 +96,6 @@ After confirming a booking or resolving the query, close warmly:
 "All sorted! See you at {{STORE_NAME}} soon. Have a great day! "
 Do not send further messages in the same thread unless the customer replies.
 
----
-
 ## ESCALATION TRIGGERS (flag to store staff immediately)
 
 - Booking confirmed → notify store with: caller number, service, preferred time, 
@@ -121,8 +109,6 @@ For complaints:
 "I'm sorry to hear that — our team will want to sort this for you personally. 
 Please call us on {{STORE_DID}} and mention this conversation."
 
----
-
 ## THREAD & STATE MANAGEMENT
 
 - Maintain context across the thread by mobile number: remember service mentioned, 
@@ -132,16 +118,12 @@ Please call us on {{STORE_DID}} and mention this conversation."
   naturally and pick up where you left off
 - One thread per mobile number; do not initiate new threads unprompted
 
----
-
 ## OPT-OUT / STOP HANDLING
 
 If customer replies STOP, UNSUBSCRIBE, OPTOUT, or similar:
 "No worries! You've been unsubscribed and won't hear from us again. Have a great day!"
 
 Immediately flag for suppression. Send no further messages. Log with audit trail.
-
----
 
 ## WHAT YOU DO NOT DO
 
@@ -151,8 +133,6 @@ Immediately flag for suppression. Send no further messages. Log with audit trail
 - Do not send to landlines or non-SMS-capable numbers (log event only)
 - Do not invent store details — use only the store variables provided
 - Do not continue chatting after a booking is confirmed and closed
-
----
 
 ## COMPLIANCE
 
@@ -215,21 +195,13 @@ Pilot stores are to be confirmed at kick-off. Standard trading hours are typical
 
 | Store | Phone DID | Code |
 | :--- | :--- | :--- |
-| Blacktown | 0290528847 | B |
-| Macquarie Centre | 0298782209 | M |
-| Top Ryde | 0291884123 | R |
-| Stanhope Garden | 0296299719 | S |
-| Werribee | 0397489210 | W |
-| Woodgrove | 0397436744 | Wg |
-| Caroline Springs | 0383485364 | CS |
-| Point Cook | 0393956166 | PC |
-| Shellharbour | 0242963444 | SH |
-| Dapto | 0242612294 | D |
-| Southgate | 0285204005 | SG |
-| Seven Hills | 0291888538 | 7H |
-| Orange | 0263611448 | O |
-| Oran Park | 0282013084 | OP |
-| Geelong | 0352227098 | G |
+| Marion | 0872286100 | MA |
+| Enex Pert | 09821200012062 / 61892260988 | EP |
+| Traralgon | 61370360442 / 09821200012620 | TR |
+| Tok H | 0370360236 | TH |
+| Dianella | 0863652926 | DI |
+| The Mezz | 0861868180 | TM |
+| Cleveland | 0738214854 | CL |
 
 **Typical trading hours**
 - Monday–Wednesday: 9:00am–5:30pm
@@ -274,7 +246,7 @@ Pilot stores are to be confirmed at kick-off. Standard trading hours are typical
 **Indicative pricing**
 
 | Service | Price |
-| :--- | :--- |
+| : | : |
 | Basic non-button blade only | from $20–$40 |
 | Standard non-button key, cut + program | from $120–$130 |
 | Flip key with remote, cut + program | from $200 |
@@ -479,7 +451,7 @@ Toyota, Hyundai, Ford, Mazda, Subaru, Honda, Nissan, Volkswagen, Commodore / Hol
 **"How long will it take?"**
 
 | Service | Typical time |
-| :--- | :--- |
+| : | : |
 | Key cutting | ~2 minutes |
 | Watch battery | 15–30 minutes |
 | Car key programming | ~20 minutes |
@@ -533,7 +505,7 @@ Conversation summary: [BRIEF SUMMARY]
 ## 14. OUT-OF-SCOPE SERVICES
 
 | Customer request | Response / referral |
-| :--- | :--- |
+| : | : |
 | Luggage zipper repair | Not offered; refer to specialist leather/luggage repairer |
 | Arch support / orthotics | Not offered; refer to podiatrist or specialist cobbler |
 | Wall/Grandfather clock servicing | Not offered; refer to watchmaker or jeweller |
@@ -645,13 +617,24 @@ export class ChatbotService {
   });
 
   async initiateChat(from: string, storeDID: string): Promise<string> {
-    const storeName = STORE_MAPPING[storeDID] || 'Store';
-
+    const store = STORE_MAPPING[storeDID];
+    const storeName = store ? store.name : 'Store';
+    
     // Clear any existing history for this session
     this.conversationStore.delete(from);
 
     // Create dynamic system prompt
-    const dynamicSystemPrompt = SYSTEM_PROMPT.replace(/\{\{STORE_NAME\}\}/g, storeName);
+    let dynamicSystemPrompt = SYSTEM_PROMPT;
+    if (store) {
+      dynamicSystemPrompt = dynamicSystemPrompt
+        .replace(/\{\{STORE_NAME\}\}/g, store.name)
+        .replace(/\{\{STORE_ADDRESS\}\}/g, store.address)
+        .replace(/\{\{STORE_TRADING_HOURS\}\}/g, store.tradingHours)
+        .replace(/\{\{STORE_STAFF_CONTACT\}\}/g, store.staffContact)
+        .replace(/\{\{STORE_DID\}\}/g, store.did);
+    } else {
+      dynamicSystemPrompt = dynamicSystemPrompt.replace(/\{\{STORE_NAME\}\}/g, storeName);
+    }
     const systemMessage: ChatMessage = {
       role: 'system',
       content: `${dynamicSystemPrompt}\n\nKNOWLEDGE BASE:\n${KNOWLEDGE_BASE}`,
@@ -675,9 +658,20 @@ export class ChatbotService {
 
     // Initialize new conversation
     if (!history) {
+      const store = STORE_MAPPING['0861868180']; // Fallback to The Mezz if hit directly
+      let dynamicSystemPrompt = SYSTEM_PROMPT;
+      if (store) {
+        dynamicSystemPrompt = dynamicSystemPrompt
+          .replace(/\{\{STORE_NAME\}\}/g, store.name)
+          .replace(/\{\{STORE_ADDRESS\}\}/g, store.address)
+          .replace(/\{\{STORE_TRADING_HOURS\}\}/g, store.tradingHours)
+          .replace(/\{\{STORE_STAFF_CONTACT\}\}/g, store.staffContact)
+          .replace(/\{\{STORE_DID\}\}/g, store.did);
+      }
+      
       const systemMessage: ChatMessage = {
         role: 'system',
-        content: `${SYSTEM_PROMPT}\n\nKNOWLEDGE BASE:\n${KNOWLEDGE_BASE}`,
+        content: `${dynamicSystemPrompt}\n\nKNOWLEDGE BASE:\n${KNOWLEDGE_BASE}`,
       };
       history = [systemMessage];
     }
