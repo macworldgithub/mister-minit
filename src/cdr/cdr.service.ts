@@ -1,5 +1,11 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import * as net from 'net';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+
+const MAX_BUFFER_SIZE = 10 * 1024; // 10KB
+const SOCKET_TIMEOUT = 60 * 1000; // 60 seconds
+const CDR_LOG_FILE = path.join(process.cwd(), 'cdr-logs.json');
 
 @Injectable()
 export class CdrService implements OnModuleInit, OnModuleDestroy {
@@ -12,15 +18,33 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
 
       let buffer = '';
 
-      socket.on('data', (data) => {
-        buffer += data.toString();
+      // Set encoding to handle multi-byte characters safely
+      socket.setEncoding('utf8');
 
-        // Process data line by line if multiple records arrive
+      // Set idle timeout
+      socket.setTimeout(SOCKET_TIMEOUT);
+
+      socket.on('timeout', () => {
+        this.logger.warn(`Socket timeout after ${SOCKET_TIMEOUT}ms. Destroying socket for ${socket.remoteAddress}`);
+        socket.destroy();
+      });
+
+      socket.on('data', (data: string) => {
+        buffer += data;
+
+        // Buffer size limit guard to prevent memory DOS
+        if (buffer.length > MAX_BUFFER_SIZE) {
+          this.logger.error(`Buffer size exceeded limit (${MAX_BUFFER_SIZE} bytes). Destroying socket for ${socket.remoteAddress}`);
+          socket.destroy();
+          return;
+        }
+
+        // Process data line by line
         let newlineIndex;
         while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
           const line = buffer.substring(0, newlineIndex);
           buffer = buffer.substring(newlineIndex + 1);
-          this.handleData(line);
+          this.handleDataLine(line);
         }
       });
 
@@ -29,7 +53,11 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
       });
 
       socket.on('end', () => {
-        this.logger.log('Client disconnected');
+        this.logger.log('Client disconnected gracefully');
+      });
+
+      socket.on('close', (hadError) => {
+        this.logger.log(`Socket closed ${hadError ? 'with error' : 'cleanly'}`);
       });
     });
 
@@ -50,31 +78,79 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private handleData(rawData: string) {
+  /**
+   * Safely parse a CSV line respecting quotes around fields containing commas.
+   */
+  private parseCsvLine(line: string): string[] {
+    const fields: string[] = [];
+    let currentField = '';
+    let inQuotes = false;
+
+    // Handle standard \r\n from Windows/3CX
+    const cleanLine = line.replace(/\r$/, '');
+
+    for (let i = 0; i < cleanLine.length; i++) {
+      const char = cleanLine[i];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        fields.push(currentField);
+        currentField = '';
+      } else {
+        currentField += char;
+      }
+    }
+    fields.push(currentField);
+    return fields.map((f) => f.trim());
+  }
+
+  private async handleDataLine(rawData: string) {
     if (!rawData.trim()) return;
 
-    // Expected format: callid, duration, time-start, time-answered, time-end, reason-terminated, from-no, from-dn, dial-no
-    const fields = rawData.split(',');
+    try {
+      const fields = this.parseCsvLine(rawData);
 
-    if (fields.length < 9) {
-      this.logger.warn(`Received malformed CDR data: ${rawData}`);
-      return;
+      // Expected format length is around 9. If significantly smaller, it's malformed.
+      if (fields.length < 5) {
+        this.logger.warn(`Received malformed CDR data (too few fields): ${rawData}`);
+        return;
+      }
+
+      const cdr = {
+        'callid': fields[0] || '',
+        'duration': fields[1] || '',
+        'time-start': fields[2] || '',
+        'time-answered': fields[3] || '',
+        'time-end': fields[4] || '',
+        'reason-terminated': fields[5] || '',
+        'from-no': fields[6] || '',
+        'from-dn': fields[7] || '',
+        'dial-no': fields[8] || '',
+      };
+
+      this.logger.log(`Successfully parsed CDR: ${cdr.callid}`);
+      this.logger.debug(`Parsed CDR Details: ${JSON.stringify(cdr)}`);
+
+      // 1. Asynchronous Persistence
+      // This is non-blocking to the TCP socket listener
+      await this.persistCdr(cdr).catch((err) => {
+        this.logger.error(`Failed to persist CDR [${cdr.callid}]: ${err.message}`, err.stack);
+      });
+
+      // 2. Business Logic Execution
+      this.executeBusinessLogic(cdr);
+
+    } catch (err: any) {
+      this.logger.error(`Unexpected error processing CDR line: ${err.message}`, err.stack);
     }
+  }
 
-    const cdr = {
-      'callid': fields[0].trim(),
-      'duration': fields[1].trim(),
-      'time-start': fields[2].trim(),
-      'time-answered': fields[3].trim(),
-      'time-end': fields[4].trim(),
-      'reason-terminated': fields[5].trim(),
-      'from-no': fields[6].trim(),
-      'from-dn': fields[7].trim(),
-      'dial-no': fields[8].trim(),
-    };
+  private async persistCdr(cdr: any) {
+    const logEntry = JSON.stringify({ timestamp: new Date().toISOString(), ...cdr }) + '\n';
+    await fs.appendFile(CDR_LOG_FILE, logEntry, 'utf8');
+  }
 
-    this.logger.debug(`Parsed CDR: ${JSON.stringify(cdr)}`);
-
+  private executeBusinessLogic(cdr: any) {
     // Internal call filter: Ignore if 'from-dn' contains a value
     if (cdr['from-dn'] !== '') {
       this.logger.debug(`Ignored internal call from DN: ${cdr['from-dn']}`);
