@@ -65,8 +65,8 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
       this.logger.error(`Server error: ${err.message}`, err.stack);
     });
 
-    this.server.listen(4005, () => {
-      this.logger.log('CDR TCP server listening on port 4005');
+    this.server.listen(4155, () => {
+      this.logger.log('CDR TCP server listening on port 4155');
     });
   }
 
