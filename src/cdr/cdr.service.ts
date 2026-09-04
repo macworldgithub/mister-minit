@@ -1,16 +1,21 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Cdr, CdrDocument } from './cdr.schema';
+import { CreateCdrDto } from './cdr.dto';
 import * as net from 'net';
-import * as fs from 'fs/promises';
-import * as path from 'path';
 
 const MAX_BUFFER_SIZE = 10 * 1024; // 10KB
 const SOCKET_TIMEOUT = 60 * 1000; // 60 seconds
-const CDR_LOG_FILE = path.join(process.cwd(), 'cdr-logs.json');
 
 @Injectable()
 export class CdrService implements OnModuleInit, OnModuleDestroy {
   private server: net.Server;
   private readonly logger = new Logger(CdrService.name);
+
+  constructor(
+    @InjectModel(Cdr.name) private cdrModel: Model<CdrDocument>,
+  ) {}
 
   onModuleInit() {
     this.server = net.createServer((socket) => {
@@ -116,9 +121,9 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
-      const cdr = {
-        'callid': fields[0] || '',
-        'duration': fields[1] || '',
+      const dto: CreateCdrDto = {
+        callid: fields[0] || '',
+        duration: fields[1] || '',
         'time-start': fields[2] || '',
         'time-answered': fields[3] || '',
         'time-end': fields[4] || '',
@@ -126,28 +131,34 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
         'from-no': fields[6] || '',
         'from-dn': fields[7] || '',
         'dial-no': fields[8] || '',
+        timestamp: new Date().toISOString(),
       };
 
-      this.logger.log(`Successfully parsed CDR: ${cdr.callid}`);
-      this.logger.debug(`Parsed CDR Details: ${JSON.stringify(cdr)}`);
+      this.logger.log(`Successfully parsed CDR: ${dto.callid}`);
+      this.logger.debug(`Parsed CDR Details: ${JSON.stringify(dto)}`);
 
-      // 1. Asynchronous Persistence
-      // This is non-blocking to the TCP socket listener
-      await this.persistCdr(cdr).catch((err) => {
-        this.logger.error(`Failed to persist CDR [${cdr.callid}]: ${err.message}`, err.stack);
+      // 1. Asynchronous Persistence to MongoDB
+      await this.saveCdr(dto).catch((err) => {
+        this.logger.error(`Failed to persist CDR [${dto.callid}]: ${err.message}`, err.stack);
       });
 
       // 2. Business Logic Execution
-      this.executeBusinessLogic(cdr);
+      this.executeBusinessLogic(dto);
 
     } catch (err: any) {
       this.logger.error(`Unexpected error processing CDR line: ${err.message}`, err.stack);
     }
   }
 
-  private async persistCdr(cdr: any) {
-    const logEntry = JSON.stringify({ timestamp: new Date().toISOString(), ...cdr }) + '\n';
-    await fs.appendFile(CDR_LOG_FILE, logEntry, 'utf8');
+  public async saveCdr(dto: CreateCdrDto) {
+    if (!dto.timestamp) {
+      dto.timestamp = new Date().toISOString();
+    }
+    return this.cdrModel.findOneAndUpdate(
+      { callid: dto.callid },
+      { $set: dto },
+      { upsert: true, new: true }
+    ).exec();
   }
 
   private executeBusinessLogic(cdr: any) {
@@ -167,8 +178,5 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
 
   private async triggerMissedCallSMS(customerNumber: string, storeDID: string) {
     this.logger.log(`[SMS TRIGGER] Missed call detected! From: ${customerNumber}, To: ${storeDID}`);
-
-    // Placeholder logic for triggering SMS
-    // Example: await this.smsService.sendMissedCallSMS(customerNumber, storeDID);
   }
 }
