@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CdrModule } from './cdr/cdr.module';
 import { ChatbotModule } from './chatbot/chatbot.module';
+import { StoreConfigModule } from './store-config/store-config.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ChatbotModule } from './chatbot/chatbot.module';
     }),
     CdrModule,
     ChatbotModule,
+    StoreConfigModule,
   ],
   controllers: [AppController],
   providers: [AppService],

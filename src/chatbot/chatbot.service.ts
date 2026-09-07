@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { STORE_MAPPING } from '../config/store.mapping';
+import { StoreConfigService } from '../store-config/store-config.service';
 import OpenAI from 'openai';
 
 export const SYSTEM_PROMPT = `
@@ -616,9 +616,11 @@ export class ChatbotService {
     apiKey: process.env.OPENAI_API_KEY,
   });
 
+  constructor(private readonly storeConfigService: StoreConfigService) {}
+
   async initiateChat(from: string, storeDID: string): Promise<string> {
-    const store = STORE_MAPPING[storeDID];
-    const storeName = store ? store.name : 'Store';
+    const store = await this.storeConfigService.getStoreByDid(storeDID);
+    const storeName = store ? store.storeName : 'Store';
     
     // Clear any existing history for this session
     this.conversationStore.delete(from);
@@ -626,11 +628,12 @@ export class ChatbotService {
     // Create dynamic system prompt
     let dynamicSystemPrompt = SYSTEM_PROMPT;
     if (store) {
+      const staffContactStr = store.staffContacts?.[0]?.mobile || '';
       dynamicSystemPrompt = dynamicSystemPrompt
-        .replace(/\{\{STORE_NAME\}\}/g, store.name)
+        .replace(/\{\{STORE_NAME\}\}/g, store.storeName)
         .replace(/\{\{STORE_ADDRESS\}\}/g, store.address)
         .replace(/\{\{STORE_TRADING_HOURS\}\}/g, store.tradingHours)
-        .replace(/\{\{STORE_STAFF_CONTACT\}\}/g, store.staffContact)
+        .replace(/\{\{STORE_STAFF_CONTACT\}\}/g, staffContactStr)
         .replace(/\{\{STORE_DID\}\}/g, store.did);
     } else {
       dynamicSystemPrompt = dynamicSystemPrompt.replace(/\{\{STORE_NAME\}\}/g, storeName);
@@ -658,14 +661,15 @@ export class ChatbotService {
 
     // Initialize new conversation
     if (!history) {
-      const store = STORE_MAPPING['0861868180']; // Fallback to The Mezz if hit directly
+      const store = await this.storeConfigService.getStoreByDid('0861868180'); // Fallback to The Mezz if hit directly
       let dynamicSystemPrompt = SYSTEM_PROMPT;
       if (store) {
+        const staffContactStr = store.staffContacts?.[0]?.mobile || '';
         dynamicSystemPrompt = dynamicSystemPrompt
-          .replace(/\{\{STORE_NAME\}\}/g, store.name)
+          .replace(/\{\{STORE_NAME\}\}/g, store.storeName)
           .replace(/\{\{STORE_ADDRESS\}\}/g, store.address)
           .replace(/\{\{STORE_TRADING_HOURS\}\}/g, store.tradingHours)
-          .replace(/\{\{STORE_STAFF_CONTACT\}\}/g, store.staffContact)
+          .replace(/\{\{STORE_STAFF_CONTACT\}\}/g, staffContactStr)
           .replace(/\{\{STORE_DID\}\}/g, store.did);
       }
       
