@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { CdrModule } from './cdr/cdr.module';
 import { ChatbotModule } from './chatbot/chatbot.module';
 import { StoreConfigModule } from './store-config/store-config.module';
+import { LoggingModule } from './logging/logging.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { StoreConfigModule } from './store-config/store-config.module';
       inject: [ConfigService],
     }),
     EventEmitterModule.forRoot(),
+    LoggingModule,
     CdrModule,
     ChatbotModule,
     StoreConfigModule,
