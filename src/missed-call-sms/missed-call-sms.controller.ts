@@ -42,12 +42,21 @@ export class MissedCallSmsController {
     // Call the handler directly and await completion
     await this.missedCallSmsService.handleCdrCreated(mockCdr);
 
-    // Query thread created for this caller
-    const thread = await this.smsThreadsService.findMostRecentByCallerNumber(body.fromNo);
+    // Always check whether THIS specific call was suppressed
+    const suppressedEvent = await this.suppressedEventsService.findByCallId(callId);
+    const suppressedReason = suppressedEvent?.suppressedReason ?? null;
+
+    // If this call was suppressed, no new thread was created by this call.
+    // findMostRecentByCallerNumber may still return a pre-existing thread.
+    const thisCallCreatedThread = suppressedReason === null;
+
+    const thread = thisCallCreatedThread
+      ? await this.smsThreadsService.findMostRecentByCallerNumber(body.fromNo)
+      : null;
 
     const store = await this.storeConfigService.getStoreByDid(body.dialNo);
 
-    // Build opening SMS text from store if thread was created
+    // Build opening SMS text only when a thread was actually created
     const openingSmsText = thread && store ? (
       `Hi, sorry we missed your call to Mister Minit ${store.storeName}.\n` +
       `Our hours: ${store.tradingHours}.\n` +
@@ -57,18 +66,11 @@ export class MissedCallSmsController {
       `Reply STOP to opt out of these messages.`
     ) : null;
 
-    // If no thread was created, look up the suppression reason
-    let suppressedReason: string | null = null;
-    if (!thread) {
-      const suppressedEvent = await this.suppressedEventsService.findByCallId(callId);
-      suppressedReason = suppressedEvent?.suppressedReason ?? null;
-    }
-
     return {
       success: true,
       mockCdr,
       result: {
-        threadCreated: !!thread,
+        threadCreated: thisCallCreatedThread,
         threadId: (thread as any)?._id ?? null,
         threadStatus: thread?.status ?? null,
         openingSentAt: thread?.openingSentAt ?? null,

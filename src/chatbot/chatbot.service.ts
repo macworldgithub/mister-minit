@@ -160,6 +160,26 @@ closeReason:
 - Sender ID: MisterMinit (ACMA compliant as of 1 July 2026)
 - Do not make any promises that require store confirmation
 - Retain a helpful, on-brand tone at all times
+
+## OUTPUT FORMAT — MANDATORY
+
+You must respond with ONLY a raw JSON object.
+No markdown. No preamble. No explanation.
+No fields other than those listed below.
+The response must start with { and end with }
+
+Required structure — every field must be present:
+{
+  "replyText": string or null,
+  "optOut": false,
+  "bookingIntentDetected": false,
+  "bookingDetails": null,
+  "threadShouldClose": false,
+  "closeReason": null
+}
+
+If you include any text outside this JSON object 
+the system will break. Return JSON only.
 `;
 export const KNOWLEDGE_BASE = `
 # MISTER MINIT — AI CUSTOMER SERVICE KNOWLEDGE BASE
@@ -777,6 +797,8 @@ export class ChatbotService {
         content: m.content,
       })),
       { role: 'user', content: newInboundMessage },
+      // NOTE: assistant prefill is Anthropic-only and breaks OpenAI's API.
+      // JSON output is enforced via the system prompt instruction instead.
     ];
 
     let rawReply: string;
@@ -785,63 +807,78 @@ export class ChatbotService {
     } catch (err: any) {
       this.logger.error(`LLM call failed: ${err.message}`, err.stack);
       const did = storeRecord?.did ?? '';
-      return { replyText: `Sorry, something went wrong. Please call us directly on ${did}.` };
-    }
-
-    // ── Detect opt-out intent from natural language ────────────────────────
-    const optOutPhrases = [
-      /\bstop\b/i, /\bopt.?out\b/i, /\bunsubscribe\b/i,
-      /don'?t (want|need|contact)/i, /leave me alone/i, /remove me/i,
-    ];
-    const isLlmOptOut = optOutPhrases.some((re) => re.test(newInboundMessage));
-    if (isLlmOptOut) {
-      return { optOut: true };
-    }
-
-    // ── Detect booking intent in LLM reply ────────────────────────────────
-    const bookingSignals = [
-      /i'?ll let the team/i,
-      /i'?ve (let|notified|told) .*(team|store)/i,
-      /see you then/i,
-      /we'?ve got you (down|booked)/i,
-    ];
-    if (bookingSignals.some((re) => re.test(rawReply))) {
-      // Extract booking details from conversation heuristically
-      const serviceMatch = newInboundMessage.match(/\b(key|shoe|watch|engrav|sharpen|remote|card)\w*/i);
-      const timeMatch = newInboundMessage.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d{1,2}[:\s]\d{2}|tomorrow|this week|next week|morning|afternoon)\b/i);
-      return {
-        bookingIntentDetected: true,
-        bookingDetails: {
-          customerName: null,
-          preferredTime: timeMatch ? timeMatch[0] : 'Time TBC',
-          serviceType: serviceMatch ? serviceMatch[0] : 'General enquiry',
-        },
-        replyText: rawReply,
+      return { 
+        replyText: `Sorry, something went wrong. Please call us directly on ${did}.`,
+        optOut: false,
+        bookingIntentDetected: false,
+        bookingDetails: null,
+        threadShouldClose: false,
+        closeReason: null
       };
     }
 
-    // ── Detect "closed_visited" — customer confirms they visited ──────────
-    const visitedSignals = [/i came in/i, /already visited/i, /been to the store/i, /sorted( it)?( out)?/i];
-    if (visitedSignals.some((re) => re.test(newInboundMessage))) {
-      return { threadShouldClose: true, closeReason: 'closed_visited' };
-    }
+    return this.parseResponse(rawReply, storeRecord?.did ?? '');
+  }
 
-    return { replyText: rawReply };
+  private parseResponse(raw: string, storeDid: string): ChatbotResponse {
+    try {
+      // Strip markdown fences if present
+      const cleaned = raw
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/```\s*$/i, '')
+        .trim();
+      
+      // Ensure starts with {
+      const jsonStr = cleaned.startsWith('{') 
+        ? cleaned 
+        : '{' + cleaned;
+      
+      // Sanitize literal newlines inside JSON string values before parsing.
+      // The LLM sometimes places real \n characters inside string values,
+      // which breaks JSON.parse even though the JSON structure is otherwise valid.
+      const sanitized = jsonStr.replace(
+        /"([^"\\]*(\\.[^"\\]*)*)"/g,
+        (match) => match.replace(/\n/g, '\\n').replace(/\r/g, '')
+      );
+
+      const parsed = JSON.parse(sanitized);
+      
+      // Validate all required fields exist; set safe defaults for any missing
+      return {
+        replyText: parsed.replyText ?? null,
+        optOut: parsed.optOut ?? false,
+        bookingIntentDetected: parsed.bookingIntentDetected ?? false,
+        bookingDetails: parsed.bookingDetails ?? null,
+        threadShouldClose: parsed.threadShouldClose ?? false,
+        closeReason: parsed.closeReason ?? null
+      };
+    } catch (e) {
+      // JSON parse failed — return safe fallback
+      return {
+        replyText: `Sorry, something went wrong. Please call us directly on ${storeDid}.`,
+        optOut: false,
+        bookingIntentDetected: false,
+        bookingDetails: null,
+        threadShouldClose: false,
+        closeReason: null
+      };
+    }
   }
 }
 
 // ── Response type exported for MissedCallSmsService ──────────────────────────
 
 export interface ChatbotResponse {
-  replyText?: string;
-  optOut?: boolean;
-  threadShouldClose?: boolean;
-  closeReason?: string;
-  bookingIntentDetected?: boolean;
-  bookingDetails?: {
+  replyText: string | null;
+  optOut: boolean;
+  threadShouldClose: boolean;
+  closeReason: string | null;
+  bookingIntentDetected: boolean;
+  bookingDetails: {
     customerName: string | null;
     preferredTime: string;
     serviceType: string;
-  };
+  } | null;
 }
 

@@ -34,6 +34,7 @@ export class SmsThreadsService {
         storeId: new Types.ObjectId(storeId),
         status: { $nin: CLOSED_STATUSES },
       })
+      .sort({ createdAt: -1 })
       .exec();
   }
 
@@ -233,5 +234,12 @@ export class SmsThreadsService {
         followUpSentAt: { $ne: null, $lte: cutoff },
       })
       .exec();
+  }
+
+  async incrementMessageCount(threadId: string): Promise<void> {
+    await this.smsThreadModel.findByIdAndUpdate(
+      threadId,
+      { $inc: { messageCount: 1 } }
+    ).exec();
   }
 }

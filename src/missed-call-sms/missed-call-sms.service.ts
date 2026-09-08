@@ -402,6 +402,8 @@ export class MissedCallSmsService {
         sentAt: new Date(),
       });
 
+      await this.smsThreadsService.incrementMessageCount(threadId);
+
       await this.loggingService.log(LogEventType.INBOUND_SMS_RECEIVED, {
         callerNumber: from,
         storeId,
