@@ -54,6 +54,20 @@ export class SmsThreadsService {
   }
 
   /**
+   * Finds the most recent active (non-closed) thread for a caller across all stores.
+   * Used by inbound SMS handler where storeId is not yet known.
+   */
+  async findMostRecentByCallerNumber(callerNumber: string): Promise<SmsThread | null> {
+    return this.smsThreadModel
+      .findOne({
+        callerNumber,
+        status: { $nin: CLOSED_STATUSES },
+      })
+      .sort({ createdAt: -1 })
+      .exec();
+  }
+
+  /**
    * Creates a new SMS thread in PENDING status.
    */
   async createThread(payload: {

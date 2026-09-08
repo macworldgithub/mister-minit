@@ -39,7 +39,7 @@ export const ConversationEntrySchema = SchemaFactory.createForClass(Conversation
 @Schema({ _id: false })
 export class BookingDetails {
   @Prop({ type: String, default: null })
-  customerName: string;
+  customerName: string | null;
 
   @Prop({ type: String, default: null })
   preferredTime: string;

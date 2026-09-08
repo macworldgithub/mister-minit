@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CdrModule } from './cdr/cdr.module';
@@ -11,6 +12,7 @@ import { LoggingModule } from './logging/logging.module';
 import { OptOutModule } from './opt-out/opt-out.module';
 import { SuppressedEventsModule } from './suppressed-events/suppressed-events.module';
 import { SmsThreadsModule } from './sms-threads/sms-threads.module';
+import { MissedCallSmsModule } from './missed-call-sms/missed-call-sms.module';
 
 @Module({
   imports: [
@@ -25,10 +27,12 @@ import { SmsThreadsModule } from './sms-threads/sms-threads.module';
       inject: [ConfigService],
     }),
     EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
     LoggingModule,
     OptOutModule,
     SuppressedEventsModule,
     SmsThreadsModule,
+    MissedCallSmsModule,
     CdrModule,
     ChatbotModule,
     StoreConfigModule,

@@ -727,4 +727,103 @@ export class ChatbotService {
     this.logger.log(`Sending SMS to ${to}: ${text}`);
     // In a real application, you would use an SMS provider like Twilio, MessageBird, etc.
   }
+
+  // ── New structured entry point consumed by MissedCallSmsService ────────────
+
+  async handleMessage(params: {
+    callerNumber: string;
+    storeRecord: any;
+    conversationHistory: Array<{ role: 'user' | 'assistant'; content: string; sentAt?: Date }>;
+    newInboundMessage: string;
+    messageCount: number;
+    missedCallId: any;
+  }): Promise<ChatbotResponse> {
+    const { storeRecord, conversationHistory, newInboundMessage } = params;
+
+    // Build dynamic system prompt from store record
+    let dynamicSystemPrompt = SYSTEM_PROMPT;
+    if (storeRecord) {
+      const staffContactStr = storeRecord.staffContacts?.[0]?.mobile || '';
+      dynamicSystemPrompt = dynamicSystemPrompt
+        .replace(/\{\{STORE_NAME\}\}/g, storeRecord.storeName ?? '')
+        .replace(/\{\{STORE_ADDRESS\}\}/g, storeRecord.address ?? '')
+        .replace(/\{\{STORE_TRADING_HOURS\}\}/g, storeRecord.tradingHours ?? '')
+        .replace(/\{\{STORE_STAFF_CONTACT\}\}/g, staffContactStr)
+        .replace(/\{\{STORE_DID\}\}/g, storeRecord.did ?? '');
+    }
+
+    // Reconstruct history in OpenAI format
+    const history: ChatMessage[] = [
+      { role: 'system', content: `${dynamicSystemPrompt}\n\nKNOWLEDGE BASE:\n${KNOWLEDGE_BASE}` },
+      ...conversationHistory.map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      })),
+      { role: 'user', content: newInboundMessage },
+    ];
+
+    let rawReply: string;
+    try {
+      rawReply = await this.callLanguageModel(history);
+    } catch (err: any) {
+      this.logger.error(`LLM call failed: ${err.message}`, err.stack);
+      return { replyText: `Sorry, I'm having trouble connecting right now. Please try again later.` };
+    }
+
+    // ── Detect opt-out intent from natural language ────────────────────────
+    const optOutPhrases = [
+      /\bstop\b/i, /\bopt.?out\b/i, /\bunsubscribe\b/i,
+      /don'?t (want|need|contact)/i, /leave me alone/i, /remove me/i,
+    ];
+    const isLlmOptOut = optOutPhrases.some((re) => re.test(newInboundMessage));
+    if (isLlmOptOut) {
+      return { optOut: true };
+    }
+
+    // ── Detect booking intent in LLM reply ────────────────────────────────
+    const bookingSignals = [
+      /i'?ll let the team/i,
+      /i'?ve (let|notified|told) .*(team|store)/i,
+      /see you then/i,
+      /we'?ve got you (down|booked)/i,
+    ];
+    if (bookingSignals.some((re) => re.test(rawReply))) {
+      // Extract booking details from conversation heuristically
+      const serviceMatch = newInboundMessage.match(/\b(key|shoe|watch|engrav|sharpen|remote|card)\w*/i);
+      const timeMatch = newInboundMessage.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d{1,2}[:\s]\d{2}|tomorrow|this week|next week|morning|afternoon)\b/i);
+      return {
+        bookingIntentDetected: true,
+        bookingDetails: {
+          customerName: null,
+          preferredTime: timeMatch ? timeMatch[0] : 'Time TBC',
+          serviceType: serviceMatch ? serviceMatch[0] : 'General enquiry',
+        },
+        replyText: rawReply,
+      };
+    }
+
+    // ── Detect "closed_visited" — customer confirms they visited ──────────
+    const visitedSignals = [/i came in/i, /already visited/i, /been to the store/i, /sorted( it)?( out)?/i];
+    if (visitedSignals.some((re) => re.test(newInboundMessage))) {
+      return { threadShouldClose: true, closeReason: 'closed_visited' };
+    }
+
+    return { replyText: rawReply };
+  }
 }
+
+// ── Response type exported for MissedCallSmsService ──────────────────────────
+
+export interface ChatbotResponse {
+  replyText?: string;
+  optOut?: boolean;
+  threadShouldClose?: boolean;
+  closeReason?: string;
+  bookingIntentDetected?: boolean;
+  bookingDetails?: {
+    customerName: string | null;
+    preferredTime: string;
+    serviceType: string;
+  };
+}
+
