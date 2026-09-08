@@ -261,7 +261,7 @@ export class MissedCallSmsService {
   // PART 2 — INBOUND SMS HANDLER
   // ══════════════════════════════════════════════════════════════════════════
 
-  async handleInboundSms(payload: InboundSmsPayload): Promise<void> {
+  async handleInboundSms(payload: InboundSmsPayload): Promise<any> {
     const { from, body } = payload;
     this.logger.log(`Inbound SMS from ${from}`);
 
@@ -271,14 +271,14 @@ export class MissedCallSmsService {
         callerNumber: from,
         metadata: { discarded: true, reason: 'already_opted_out' },
       });
-      return;
+      return { discarded: true, reason: 'already_opted_out' };
     }
 
     // ── Step 2: Keyword opt-out (always before LLM) ────────────────────────
     const keyword = body.trim().toUpperCase();
     if (OPT_OUT_KEYWORDS.has(keyword)) {
       await this.handleKeywordOptOut(from, keyword);
-      return;
+      return { optOut: true, source: 'keyword' };
     }
 
     // ── Step 3: Find active thread ─────────────────────────────────────────
@@ -290,7 +290,7 @@ export class MissedCallSmsService {
         callerNumber: from,
         metadata: { discarded: true, reason: 'no_active_thread' },
       });
-      return;
+      return { discarded: true, reason: 'no_active_thread' };
     }
 
     const threadId = (recentThread as any)._id.toString();
@@ -330,7 +330,7 @@ export class MissedCallSmsService {
         threadId,
         metadata: { source: 'llm_detected' },
       });
-      return;
+      return { ...chatbotResponse, threadId };
     }
 
     // Customer has visited — close silently, no reply
@@ -343,7 +343,7 @@ export class MissedCallSmsService {
         threadId,
         metadata: { closeReason: ThreadStatus.CLOSED_VISITED },
       });
-      return;
+      return { ...chatbotResponse, threadId };
     }
 
     // Booking captured
@@ -376,7 +376,7 @@ export class MissedCallSmsService {
         storeName,
         threadId,
       });
-      return;
+      return { ...chatbotResponse, threadId };
     }
 
     // Normal reply
@@ -402,6 +402,8 @@ export class MissedCallSmsService {
         metadata: { inboundBody: body, replyText: chatbotResponse.replyText },
       });
     }
+
+    return { ...chatbotResponse, threadId };
   }
 
   // ══════════════════════════════════════════════════════════════════════════

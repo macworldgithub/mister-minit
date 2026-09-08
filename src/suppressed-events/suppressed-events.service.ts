@@ -25,7 +25,7 @@ export class SuppressedEventsService {
   constructor(
     @InjectModel(SuppressedEvent.name)
     private suppressedEventModel: Model<SuppressedEventDocument>,
-  ) {}
+  ) { }
 
   async suppress(payload: SuppressPayload): Promise<void> {
     try {
@@ -48,5 +48,9 @@ export class SuppressedEventsService {
       );
       throw err;
     }
+  }
+
+  async findByCallId(callId: string): Promise<SuppressedEventDocument | null> {
+    return this.suppressedEventModel.findOne({ callId }).exec();
   }
 }
