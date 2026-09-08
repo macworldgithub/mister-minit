@@ -8,6 +8,7 @@ import { CdrModule } from './cdr/cdr.module';
 import { ChatbotModule } from './chatbot/chatbot.module';
 import { StoreConfigModule } from './store-config/store-config.module';
 import { LoggingModule } from './logging/logging.module';
+import { OptOutModule } from './opt-out/opt-out.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { LoggingModule } from './logging/logging.module';
     }),
     EventEmitterModule.forRoot(),
     LoggingModule,
+    OptOutModule,
     CdrModule,
     ChatbotModule,
     StoreConfigModule,
