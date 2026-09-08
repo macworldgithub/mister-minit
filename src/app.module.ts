@@ -10,6 +10,7 @@ import { StoreConfigModule } from './store-config/store-config.module';
 import { LoggingModule } from './logging/logging.module';
 import { OptOutModule } from './opt-out/opt-out.module';
 import { SuppressedEventsModule } from './suppressed-events/suppressed-events.module';
+import { SmsThreadsModule } from './sms-threads/sms-threads.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { SuppressedEventsModule } from './suppressed-events/suppressed-events.mo
     LoggingModule,
     OptOutModule,
     SuppressedEventsModule,
+    SmsThreadsModule,
     CdrModule,
     ChatbotModule,
     StoreConfigModule,
