@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cdr, CdrDocument } from './cdr.schema';
 import { CreateCdrDto } from './cdr.dto';
 import * as net from 'net';
@@ -15,6 +16,7 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     @InjectModel(Cdr.name) private cdrModel: Model<CdrDocument>,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   onModuleInit() {
@@ -138,9 +140,14 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
       this.logger.debug(`Parsed CDR Details: ${JSON.stringify(dto)}`);
 
       // 1. Asynchronous Persistence to MongoDB
-      await this.saveCdr(dto).catch((err) => {
+      const savedDocument = await this.saveCdr(dto).catch((err) => {
         this.logger.error(`Failed to persist CDR [${dto.callid}]: ${err.message}`, err.stack);
+        return null;
       });
+
+      if (savedDocument) {
+        this.eventEmitter.emit('cdr.created', savedDocument);
+      }
 
       // 2. Business Logic Execution
       this.executeBusinessLogic(dto);
