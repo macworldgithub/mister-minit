@@ -103,7 +103,7 @@ export class MissedCallSmsService {
     const isMissedCall = this.checkMissedCall(reasonTerminated, duration);
     if (!isMissedCall) {
       const totalSecs = this.parseDurationToSeconds(duration);
-      if (totalSecs >= 10) {
+      if (totalSecs >= 10 && MOBILE_REGEX.test(fromNo)) {
         const activeThread = await this.smsThreadsService.findActiveThread(fromNo, storeId);
         if (activeThread) {
           await this.smsThreadsService.closeThread(
@@ -200,23 +200,26 @@ export class MissedCallSmsService {
 
     if (existingThread) {
       const openingSentAt = existingThread.openingSentAt;
-      if (openingSentAt && Date.now() - openingSentAt.getTime() < DEDUP_WINDOW_MS) {
-        await this.doSuppress({
-          callerNumber: fromNo,
-          did: dialNo,
-          storeId,
-          storeName,
-          callId,
-          suppressedReason: SuppressedReason.DEDUP,
-        });
-        await this.loggingService.log(LogEventType.DEDUP_BLOCKED, {
-          callerNumber: fromNo,
-          storeId,
-          storeName,
-          callId,
-          metadata: { existingThreadId: (existingThread as any)._id.toString() },
-        });
-        return;
+      if (openingSentAt) {
+        const sixtyMinsAgo = new Date(Date.now() - 60 * 60 * 1000);
+        if (openingSentAt > sixtyMinsAgo) {
+          await this.doSuppress({
+            callerNumber: fromNo,
+            did: dialNo,
+            storeId,
+            storeName,
+            callId,
+            suppressedReason: SuppressedReason.DEDUP,
+          });
+          await this.loggingService.log(LogEventType.DEDUP_BLOCKED, {
+            callerNumber: fromNo,
+            storeId,
+            storeName,
+            callId,
+            metadata: { openingSentAt },
+          });
+          return;
+        }
       }
       threadId = (existingThread as any)._id.toString();
     } else {
