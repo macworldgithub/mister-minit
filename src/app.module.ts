@@ -9,6 +9,7 @@ import { ChatbotModule } from './chatbot/chatbot.module';
 import { StoreConfigModule } from './store-config/store-config.module';
 import { LoggingModule } from './logging/logging.module';
 import { OptOutModule } from './opt-out/opt-out.module';
+import { SuppressedEventsModule } from './suppressed-events/suppressed-events.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { OptOutModule } from './opt-out/opt-out.module';
     EventEmitterModule.forRoot(),
     LoggingModule,
     OptOutModule,
+    SuppressedEventsModule,
     CdrModule,
     ChatbotModule,
     StoreConfigModule,
