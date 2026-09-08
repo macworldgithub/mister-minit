@@ -357,10 +357,18 @@ export class MissedCallSmsService {
 
       // Notify each staff contact
       if (store?.staffContacts?.length) {
-        const staffBody = this.buildStaffNotification(store, from, bd);
-        for (const contact of store.staffContacts) {
-          await this.sendWithRetry(contact.mobile, staffBody, MAX_SMS_RETRIES);
-        }
+        store.staffContacts.forEach(contact => {
+          if (contact.mobile) {
+            this.smsProviderService.sendSms(
+              contact.mobile,
+              `New booking request — Mister Minit ${store.storeName}\n` +
+              `Customer: ${bd.customerName ?? 'Not provided'}\n` +
+              `Mobile: ${from}\n` +
+              `Service: ${bd.serviceType}\n` +
+              `Preferred time: ${bd.preferredTime}`
+            );
+          }
+        });
       }
 
       await this.loggingService.log(LogEventType.BOOKING_CAPTURED, {
@@ -436,6 +444,8 @@ export class MissedCallSmsService {
         }
 
         const store = await this.storeConfigService.getStoreByDid(thread.did);
+        if (!store) continue; // skip if store not found
+
         const body = this.buildFollowUpSms(store);
         await this.sendWithRetry(thread.callerNumber, body, MAX_SMS_RETRIES);
         await this.smsThreadsService.setFollowUpSent(threadId);
@@ -555,10 +565,11 @@ export class MissedCallSmsService {
 
   private buildOpeningSms(store: StoreConfig): string {
     return (
-      `Hi, sorry we missed your call to Mister Minit ${store.storeName}. ` +
-      `Our hours: ${store.tradingHours}. ` +
-      `Find us here: ${store.googleMapsLink} ` +
-      `Is there something we can help with — keys, shoe repairs, engraving, watches or sharpening? ` +
+      `Hi, sorry we missed your call to Mister Minit ${store.storeName}.\n` +
+      `Our hours: ${store.tradingHours}.\n` +
+      `Find us here: ${store.googleMapsLink}\n` +
+      `Is there something we can help with — keys, shoe repairs, ` +
+      `engraving, watches or sharpening?\n` +
       `Reply STOP to opt out of these messages.`
     );
   }
@@ -567,8 +578,10 @@ export class MissedCallSmsService {
     if (!store) return 'Hi, just checking in from Mister Minit — did you make it into the store?';
     return (
       `Hi, just checking in from Mister Minit ${store.storeName} — ` +
-      `did you make it into the store, or is there anything else we can help with? ` +
-      `Hours: ${store.tradingHours}. Find us: ${store.googleMapsLink} ` +
+      `did you make it into the store, or is there anything ` +
+      `else we can help with?\n` +
+      `Hours: ${store.tradingHours}. ` +
+      `Find us: ${store.googleMapsLink}\n` +
       `Reply STOP to opt out.`
     );
   }

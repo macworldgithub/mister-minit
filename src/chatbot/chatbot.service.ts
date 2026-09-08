@@ -761,12 +761,11 @@ export class ChatbotService {
     // Build dynamic system prompt from store record
     let dynamicSystemPrompt = SYSTEM_PROMPT;
     if (storeRecord) {
-      const staffContactStr = storeRecord.staffContacts?.[0]?.mobile || '';
       dynamicSystemPrompt = dynamicSystemPrompt
         .replace(/\{\{STORE_NAME\}\}/g, storeRecord.storeName ?? '')
         .replace(/\{\{STORE_ADDRESS\}\}/g, storeRecord.address ?? '')
         .replace(/\{\{STORE_TRADING_HOURS\}\}/g, storeRecord.tradingHours ?? '')
-        .replace(/\{\{STORE_STAFF_CONTACT\}\}/g, staffContactStr)
+        .replace(/\{\{GOOGLE_MAPS_LINK\}\}/g, storeRecord.googleMapsLink ?? '')
         .replace(/\{\{STORE_DID\}\}/g, storeRecord.did ?? '');
     }
 
@@ -785,7 +784,8 @@ export class ChatbotService {
       rawReply = await this.callLanguageModel(history);
     } catch (err: any) {
       this.logger.error(`LLM call failed: ${err.message}`, err.stack);
-      return { replyText: `Sorry, I'm having trouble connecting right now. Please try again later.` };
+      const did = storeRecord?.did ?? '';
+      return { replyText: `Sorry, something went wrong. Please call us directly on ${did}.` };
     }
 
     // ── Detect opt-out intent from natural language ────────────────────────

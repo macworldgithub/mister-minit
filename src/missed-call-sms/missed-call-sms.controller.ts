@@ -45,20 +45,17 @@ export class MissedCallSmsController {
     // Query thread created for this caller
     const thread = await this.smsThreadsService.findMostRecentByCallerNumber(body.fromNo);
 
+    const store = await this.storeConfigService.getStoreByDid(body.dialNo);
+
     // Build opening SMS text from store if thread was created
-    let openingSmsText: string | null = null;
-    if (thread) {
-      const store = await this.storeConfigService.getStoreByDid(body.dialNo);
-      if (store) {
-        const mapsLink = (store as any).googleMapsLink ?? '';
-        openingSmsText =
-          `Hi, sorry we missed your call to Mister Minit ${store.storeName}. ` +
-          `Our hours: ${store.tradingHours}. ` +
-          (mapsLink ? `Find us here: ${mapsLink} ` : '') +
-          `Is there something we can help with — keys, shoe repairs, engraving, ` +
-          `watches or sharpening? Reply STOP to opt out of these messages.`;
-      }
-    }
+    const openingSmsText = thread && store ? (
+      `Hi, sorry we missed your call to Mister Minit ${store.storeName}.\n` +
+      `Our hours: ${store.tradingHours}.\n` +
+      `Find us here: ${store.googleMapsLink}\n` +
+      `Is there something we can help with — keys, shoe repairs, ` +
+      `engraving, watches or sharpening?\n` +
+      `Reply STOP to opt out of these messages.`
+    ) : null;
 
     // If no thread was created, look up the suppression reason
     let suppressedReason: string | null = null;
