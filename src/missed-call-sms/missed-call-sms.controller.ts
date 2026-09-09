@@ -90,8 +90,8 @@ export class MissedCallSmsController {
       body: body.body,
     });
 
-    // Fetch updated thread state
-    const thread = await this.smsThreadsService.findMostRecentByCallerNumber(body.from);
+    // Fetch updated thread state, even if it was closed by this message
+    const thread = await this.smsThreadsService.findMostRecentThreadAnyStatus(body.from);
 
     return {
       success: true,

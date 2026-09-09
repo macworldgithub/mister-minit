@@ -747,8 +747,9 @@ export class ChatbotService {
       const response = await this.openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: history,
-        max_tokens: 150,
+        max_tokens: 500,
         temperature: 0.7,
+        response_format: { type: 'json_object' },
       });
 
       return response.choices[0].message.content || 'Sorry, I am having trouble connecting right now. Please try again later.';
@@ -804,6 +805,7 @@ export class ChatbotService {
     let rawReply: string;
     try {
       rawReply = await this.callLanguageModel(history);
+      this.logger.debug(`Raw LLM response: ${rawReply}`);
     } catch (err: any) {
       this.logger.error(`LLM call failed: ${err.message}`, err.stack);
       const did = storeRecord?.did ?? '';
@@ -853,7 +855,8 @@ export class ChatbotService {
         threadShouldClose: parsed.threadShouldClose ?? false,
         closeReason: parsed.closeReason ?? null
       };
-    } catch (e) {
+    } catch (e: any) {
+      this.logger.error(`Failed to parse LLM response as JSON: ${e.message}`, e.stack);
       // JSON parse failed — return safe fallback
       return {
         replyText: `Sorry, something went wrong. Please call us directly on ${storeDid}.`,

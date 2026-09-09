@@ -69,6 +69,17 @@ export class SmsThreadsService {
   }
 
   /**
+   * Finds the most recent thread for a caller across all stores, regardless of status.
+   * Useful for test endpoints to inspect the final state of closed threads.
+   */
+  async findMostRecentThreadAnyStatus(callerNumber: string): Promise<SmsThread | null> {
+    return this.smsThreadModel
+      .findOne({ callerNumber })
+      .sort({ createdAt: -1 })
+      .exec();
+  }
+
+  /**
    * Creates a new SMS thread in PENDING status.
    */
   async createThread(payload: {

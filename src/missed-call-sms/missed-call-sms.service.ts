@@ -278,7 +278,13 @@ export class MissedCallSmsService {
     const keyword = body.trim().toUpperCase();
     if (OPT_OUT_KEYWORDS.has(keyword)) {
       await this.handleKeywordOptOut(from, keyword);
-      return { optOut: true, source: 'keyword' };
+      return { 
+        optOut: true, 
+        source: 'keyword',
+        replyText: this.buildOptOutConfirmation(),
+        threadShouldClose: true,
+        closeReason: ThreadStatus.CLOSED_OPTED_OUT
+      };
     }
 
     // ── Step 3: Find active thread ─────────────────────────────────────────
