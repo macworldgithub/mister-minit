@@ -10,6 +10,6 @@ import { SmsThreadsService } from './sms-threads.service';
     ]),
   ],
   providers: [SmsThreadsService],
-  exports: [SmsThreadsService],
+  exports: [SmsThreadsService, MongooseModule],
 })
 export class SmsThreadsModule {}

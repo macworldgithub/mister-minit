@@ -59,7 +59,7 @@ team will sort it. Hours: {{STORE_TRADING_HOURS}}.
 ## BOOKING FLOW
 
 Once you know what service they need:
-"When would suit you to come in? We're open {{STORE_TRADING_HOURS}}."
+"What's your name and when would suit you to come in? We're open {{STORE_TRADING_HOURS}}.
 
 Once they give a preferred time, extract:
 - customerName (if they offered it, otherwise null)
@@ -85,6 +85,20 @@ If customer explicitly requests to speak to a person:
 "Of course — please call us on {{STORE_DID}} during 
 {{STORE_TRADING_HOURS}} and the team will help you."
 
+## CAR KEY EMERGENCY ESCALATION
+
+If customer indicates a car key emergency (stranded, lost all keys, urgent):
+First reply must be:
+"Are you in an emergency situation — e.g. stranded or lost all your keys?
+Reply YES or NO."
+
+If they reply YES:
+"For immediate help, call our mobile service on 1800 766 600 — they can assist you on-site faster than we can in-store."
+Set threadShouldClose: true, closeReason: null, replyText: [above message]
+
+If they reply NO:
+Continue standard car key flow per SERVICE KNOWLEDGE & PRICING.
+
 ## WHAT YOU MUST DETECT AND SIGNAL
 
 You must always return a valid JSON response (no markdown, 
@@ -94,6 +108,7 @@ no preamble, raw JSON only) in this exact structure:
   "replyText": string | null,
   "optOut": boolean,
   "bookingIntentDetected": boolean,
+  "emergencyEscalation": boolean
   "bookingDetails": {
     "customerName": string | null,
     "preferredTime": string | null,
@@ -141,18 +156,15 @@ closeReason:
 
 ## WHAT YOU DO NOT DO
 
-- Do not discuss competitors, politics, or anything 
-  unrelated to Mister Minit
-- Do not make promises about warranties, employment, 
-  or legal matters
-- Do not engage with offensive or abusive messages — 
-  politely disengage
-- Do not invent store details — use only store variables 
-  provided above
+- Do not discuss competitors, politics, or anything unrelated to Mister Minit
+- Do not make promises about warranties, employment, or legal matters
+- Do not engage with offensive or abusive messages — politely disengage
+- Do not invent store details — use only store variables provided above
 - Do not continue chatting after a booking is confirmed
 - Do not say "appointment confirmed" or "you are booked in"
 - Do not suggest or mention any other store location
 - Do not send any reply when threadShouldClose is true
+- Do not process a car key booking without first checking if the situation is an emergency
 
 ## COMPLIANCE
 
@@ -228,31 +240,7 @@ export const KNOWLEDGE_BASE = `
 - Say that availability depends on the store/system and recommend checking with the store team.
 - If the requested service is explicitly out of scope, say so honestly and suggest the listed referral where available.
 
-## 2. STORE DIRECTORY
-Pilot stores are to be confirmed at kick-off. Standard trading hours are typical and must be confirmed per store.
-
-| Store | Phone DID | Code |
-| :--- | :--- | :--- |
-| Marion | 0872286100 | MA |
-| Enex Pert | 09821200012062 / 61892260988 | EP |
-| Traralgon | 61370360442 / 09821200012620 | TR |
-| Tok H | 0370360236 | TH |
-| Dianella | 0863652926 | DI |
-| The Mezz | 0861868180 | TM |
-| Cleveland | 0738214854 | CL |
-
-**Typical trading hours**
-- Monday–Wednesday: 9:00am–5:30pm
-- Thursday: 9:00am–9:00pm
-- Friday: 9:00am–5:30pm
-- Saturday: 9:00am–5:00pm
-- Sunday: 10:00am–5:00pm
-- Public holidays: typically closed
-- SMS system: operates 24/7
-
-*Trading hours can vary by store, especially major shopping centres. Do not guarantee hours unless the store's hours are available from the current system.*
-
-## 3. SERVICE: STANDARD KEY CUTTING
+## 2. SERVICE: STANDARD KEY CUTTING
 **What is offered**
 - Duplicate standard house/door keys.
 - Customer should bring the original key.
@@ -275,7 +263,7 @@ Pilot stores are to be confirmed at kick-off. Standard trading hours are typical
 **Suggested customer response**
 > "No worries — standard key cutting starts from about $10 and usually takes around 2 minutes. Just bring the original key in and we can check it for you. Final pricing can vary depending on the key."
 
-## 4. SERVICE: CAR KEYS & TRANSPONDER KEYS
+## 3. SERVICE: CAR KEYS & TRANSPONDER KEYS
 **General rule**
 - Car keys are the highest-volume service.
 - Pricing varies significantly by vehicle make/model.
@@ -319,7 +307,7 @@ Toyota, Hyundai, Ford, Mazda, Subaru, Honda, Nissan, Volkswagen, Commodore / Hol
 **Suggested response**
 > "We handle most car makes. Pricing depends on the make, model and key type — for example, standard programmed keys start from around $120–$130, while remote/smart keys can be more. If you bring the car and your existing key into the store, the team can check it and give you the final quote."
 
-## 5. SERVICE: GARAGE & GATE REMOTES
+## 4. SERVICE: GARAGE & GATE REMOTES
 **What is offered**
 - Compatible garage/gate remote cloning or replacement.
 - Fixed-code remotes can often be cloned.
@@ -344,7 +332,7 @@ Toyota, Hyundai, Ford, Mazda, Subaru, Honda, Nissan, Volkswagen, Commodore / Hol
 **Battery-only request**
 - Battery replacement does not require coding.
 
-## 6. SERVICE: ACCESS CARDS & KEY FOBS (RFID)
+## 5. SERVICE: ACCESS CARDS & KEY FOBS (RFID)
 **What is offered**
 - Copy/duplicate access cards and key fobs at most stores.
 
@@ -358,7 +346,7 @@ Toyota, Hyundai, Ford, Mazda, Subaru, Honda, Nissan, Volkswagen, Commodore / Hol
 - Some encrypted or managed-system cards cannot be duplicated.
 - Examples include some body corporate and government-managed systems.
 
-## 7. SERVICE: WATCH BATTERY REPLACEMENT
+## 6. SERVICE: WATCH BATTERY REPLACEMENT
 **Standard watch battery**
 - From $28–$30.
 - 2-year warranty.
@@ -384,7 +372,7 @@ Toyota, Hyundai, Ford, Mazda, Subaru, Honda, Nissan, Volkswagen, Commodore / Hol
 **Suggested response**
 > "Yes, we can usually replace watch batteries while you wait. Standard batteries start from around $28–$30 and generally take 15–30 minutes. Bring the watch in and the team can confirm the exact price."
 
-## 8. SERVICE: WATCH REPAIRS & BAND ADJUSTMENTS
+## 7. SERVICE: WATCH REPAIRS & BAND ADJUSTMENTS
 **Band / link adjustment**
 - Watch band resize / link removal: from $20.
 - Metal strap adjustment: $20.
@@ -399,7 +387,7 @@ Toyota, Hyundai, Ford, Mazda, Subaru, Honda, Nissan, Volkswagen, Commodore / Hol
 - Full clock servicing for wall clocks or grandfather clocks is not offered; refer to a watchmaker or jeweller.
 - Complex mechanical repairs may need a specialist.
 
-## 9. SERVICE: SHOE REPAIR & CARE
+## 8. SERVICE: SHOE REPAIR & CARE
 **Heel replacement**
 - Stiletto heel rubber tips: from $35 per pair.
 - Heel pieces supplied by customer: from $20 per pair.
@@ -436,7 +424,7 @@ Toyota, Hyundai, Ford, Mazda, Subaru, Honda, Nissan, Volkswagen, Commodore / Hol
 - Many simple repairs: while-you-wait or same day.
 - Complex jobs / parts orders: typically 1–2 weeks.
 
-## 10. SERVICE: ENGRAVING
+## 9. SERVICE: ENGRAVING
 **Laser engraving**
 - Initials / short text: from $25.
 - Additional word: from $5 extra.
@@ -465,7 +453,7 @@ Toyota, Hyundai, Ford, Mazda, Subaru, Honda, Nissan, Volkswagen, Commodore / Hol
 - Pressurised bottles cannot be engraved.
 - Ring resizing is not offered; refer to a jeweller.
 
-## 11. SERVICE: KNIFE & TOOL SHARPENING
+## 10. SERVICE: KNIFE & TOOL SHARPENING
 **Knife sharpening**
 - From $10 per knife depending on knife type and size.
 - Blades under 30 cm: $15–$20 per knife.
@@ -482,7 +470,7 @@ Toyota, Hyundai, Ford, Mazda, Subaru, Honda, Nissan, Volkswagen, Commodore / Hol
 **Appointment**
 - No appointment needed; walk-in.
 
-## 12. COMMON CUSTOMER QUESTIONS
+## 11. COMMON CUSTOMER QUESTIONS
 **"Do I need an appointment?"**
 > "No appointment is needed for most services — just walk in. For larger jobs such as bulk engraving or shoe stretching, it's handy to call ahead so the team can get set up for you."
 
@@ -519,7 +507,7 @@ Toyota, Hyundai, Ford, Mazda, Subaru, Honda, Nissan, Volkswagen, Commodore / Hol
 **"I'm not sure what's wrong with my key"**
 > "No worries — it may just be the battery. Bring it in and we'll take a look. If it needs more work, the team can quote you before doing anything."
 
-## 13. CUSTOMER VISIT / BOOKING CAPTURE
+## 12. CUSTOMER VISIT / BOOKING CAPTURE
 **When the customer indicates they intend to visit, capture:**
 - Service type
 - Preferred day
@@ -540,7 +528,7 @@ Preferred: [DAY/TIME]
 Conversation summary: [BRIEF SUMMARY]
 \`\`\`
 
-## 14. OUT-OF-SCOPE SERVICES
+## 13. OUT-OF-SCOPE SERVICES
 
 | Customer request | Response / referral |
 | : | : |
@@ -554,7 +542,7 @@ Conversation summary: [BRIEF SUMMARY]
 | Leather embossing | Availability varies by store; check with store team |
 | POS sales items / retail queries | Refer in-store |
 
-## 15. ESCALATION / HUMAN HANDOVER
+## 14. ESCALATION / HUMAN HANDOVER
 **Escalate to store staff when**
 - Customer complains about a previous job.
 - Customer says they are unhappy with previous work.
@@ -565,7 +553,7 @@ Conversation summary: [BRIEF SUMMARY]
 **Customer-facing escalation message**
 > "I want to make sure you get the right help here — I'll flag this for the team at {{STORE_NAME}} to call you back. Is [CALLBACK NUMBER] the best number for them to reach you on?"
 
-## 16. CALL-VOLUME INSIGHTS
+## 15. CALL-VOLUME INSIGHTS
 *These are operational observations, not customer-facing claims unless relevant to the business workflow.*
 - **Source data:** 20,000+ real call records, 4,000+ transcriptions/summaries
 
@@ -593,7 +581,7 @@ Conversation summary: [BRIEF SUMMARY]
 - Shoe stretching usually takes 24–48 hours.
 - Engraving is frequently completed same-day in 10–30 minutes.
 
-## 17. RESPONSE DECISION LOGIC
+## 16. RESPONSE DECISION LOGIC
 **If customer asks for a price**
 - Identify the service.
 - Give the relevant indicative "from/around" price.
@@ -625,7 +613,7 @@ Conversation summary: [BRIEF SUMMARY]
 - Say the store team can confirm the specific case.
 - If appropriate, offer a callback/escalation.
 
-## 18. IMPORTANT CUSTOMER-FACING SAFETY / ACCURACY RULES
+## 17. IMPORTANT CUSTOMER-FACING SAFETY / ACCURACY RULES
 - Never guarantee an exact price from this KB.
 - Never guarantee a complex repair completion time.
 - Never claim every store offers every service when the KB says availability varies.
@@ -634,7 +622,6 @@ Conversation summary: [BRIEF SUMMARY]
 - Never promise a lost-all-car-keys job can be completed.
 - Never reveal internal call-volume statistics unless specifically authorized for an internal use case.
 - Never send internal booking notifications to customers.
-
 `;
 
 interface ChatMessage {
@@ -809,7 +796,7 @@ export class ChatbotService {
     } catch (err: any) {
       this.logger.error(`LLM call failed: ${err.message}`, err.stack);
       const did = storeRecord?.did ?? '';
-      return { 
+      return {
         replyText: `Sorry, something went wrong. Please call us directly on ${did}.`,
         optOut: false,
         bookingIntentDetected: false,
@@ -830,12 +817,12 @@ export class ChatbotService {
         .replace(/^```\s*/i, '')
         .replace(/```\s*$/i, '')
         .trim();
-      
+
       // Ensure starts with {
-      const jsonStr = cleaned.startsWith('{') 
-        ? cleaned 
+      const jsonStr = cleaned.startsWith('{')
+        ? cleaned
         : '{' + cleaned;
-      
+
       // Sanitize literal newlines inside JSON string values before parsing.
       // The LLM sometimes places real \n characters inside string values,
       // which breaks JSON.parse even though the JSON structure is otherwise valid.
@@ -845,7 +832,7 @@ export class ChatbotService {
       );
 
       const parsed = JSON.parse(sanitized);
-      
+
       // Validate all required fields exist; set safe defaults for any missing
       return {
         replyText: parsed.replyText ?? null,
