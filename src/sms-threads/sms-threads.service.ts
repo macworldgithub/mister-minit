@@ -58,7 +58,9 @@ export class SmsThreadsService {
    * Finds the most recent active (non-closed) thread for a caller across all stores.
    * Used by inbound SMS handler where storeId is not yet known.
    */
-  async findMostRecentByCallerNumber(callerNumber: string): Promise<SmsThread | null> {
+  async findMostRecentByCallerNumber(
+    callerNumber: string,
+  ): Promise<SmsThread | null> {
     return this.smsThreadModel
       .findOne({
         callerNumber,
@@ -72,7 +74,9 @@ export class SmsThreadsService {
    * Finds the most recent thread for a caller across all stores, regardless of status.
    * Useful for test endpoints to inspect the final state of closed threads.
    */
-  async findMostRecentThreadAnyStatus(callerNumber: string): Promise<SmsThread | null> {
+  async findMostRecentThreadAnyStatus(
+    callerNumber: string,
+  ): Promise<SmsThread | null> {
     return this.smsThreadModel
       .findOne({ callerNumber })
       .sort({ createdAt: -1 })
@@ -118,10 +122,7 @@ export class SmsThreadsService {
     entry: ConversationEntry,
   ): Promise<void> {
     await this.smsThreadModel
-      .updateOne(
-        { _id: threadId },
-        { $push: { conversationHistory: entry } },
-      )
+      .updateOne({ _id: threadId }, { $push: { conversationHistory: entry } })
       .exec();
   }
 
@@ -192,7 +193,7 @@ export class SmsThreadsService {
           $set: {
             closedAt: new Date(),
             closedReason: reason,
-            status: reason as ThreadStatus,
+            status: reason,
           },
         },
       )
@@ -204,10 +205,7 @@ export class SmsThreadsService {
    */
   async setFollowUpSent(threadId: string): Promise<void> {
     await this.smsThreadModel
-      .updateOne(
-        { _id: threadId },
-        { $set: { followUpSentAt: new Date() } },
-      )
+      .updateOne({ _id: threadId }, { $set: { followUpSentAt: new Date() } })
       .exec();
   }
 
@@ -248,9 +246,8 @@ export class SmsThreadsService {
   }
 
   async incrementMessageCount(threadId: string): Promise<void> {
-    await this.smsThreadModel.findByIdAndUpdate(
-      threadId,
-      { $inc: { messageCount: 1 } }
-    ).exec();
+    await this.smsThreadModel
+      .findByIdAndUpdate(threadId, { $inc: { messageCount: 1 } })
+      .exec();
   }
 }

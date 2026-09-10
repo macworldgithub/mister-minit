@@ -25,7 +25,7 @@ export class SuppressedEventsService {
   constructor(
     @InjectModel(SuppressedEvent.name)
     private suppressedEventModel: Model<SuppressedEventDocument>,
-  ) { }
+  ) {}
 
   async suppress(payload: SuppressPayload): Promise<void> {
     try {

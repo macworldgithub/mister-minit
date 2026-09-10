@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiBody } from '@nestjs/swagger';
 import { StoreConfigService } from './store-config.service';
 import { CreateStoreConfigDto } from './dto/create-store-config.dto';
@@ -10,7 +18,11 @@ export class StoreConfigController {
   constructor(private readonly storeConfigService: StoreConfigService) {}
 
   @Post('migrate')
-  @ApiOperation({ summary: 'Migrate existing store data from static config into MongoDB', description: 'One-time migration — reads STORE_MAPPING and inserts records that do not exist yet.' })
+  @ApiOperation({
+    summary: 'Migrate existing store data from static config into MongoDB',
+    description:
+      'One-time migration — reads STORE_MAPPING and inserts records that do not exist yet.',
+  })
   migrateData() {
     return this.storeConfigService.migrateData();
   }
@@ -30,14 +42,22 @@ export class StoreConfigController {
 
   @Get(':did')
   @ApiOperation({ summary: 'Get a single store config by DID (3CX dial-no)' })
-  @ApiParam({ name: 'did', example: '0872286100', description: 'The 3CX dial number identifying the store' })
+  @ApiParam({
+    name: 'did',
+    example: '0872286100',
+    description: 'The 3CX dial number identifying the store',
+  })
   findOne(@Param('did') did: string) {
     return this.storeConfigService.findOneByDid(did);
   }
 
   @Patch(':did')
   @ApiOperation({ summary: 'Update a store config by DID' })
-  @ApiParam({ name: 'did', example: '0872286100', description: 'The 3CX dial number identifying the store' })
+  @ApiParam({
+    name: 'did',
+    example: '0872286100',
+    description: 'The 3CX dial number identifying the store',
+  })
   @ApiBody({ type: UpdateStoreConfigDto })
   update(@Param('did') did: string, @Body() updateDto: UpdateStoreConfigDto) {
     return this.storeConfigService.update(did, updateDto);
@@ -45,7 +65,11 @@ export class StoreConfigController {
 
   @Delete(':did')
   @ApiOperation({ summary: 'Delete a store config by DID' })
-  @ApiParam({ name: 'did', example: '0872286100', description: 'The 3CX dial number identifying the store' })
+  @ApiParam({
+    name: 'did',
+    example: '0872286100',
+    description: 'The 3CX dial number identifying the store',
+  })
   remove(@Param('did') did: string) {
     return this.storeConfigService.remove(did);
   }

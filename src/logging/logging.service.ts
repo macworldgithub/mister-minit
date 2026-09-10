@@ -16,9 +16,7 @@ export interface LogPayload {
 export class LoggingService {
   private readonly logger = new Logger(LoggingService.name);
 
-  constructor(
-    @InjectModel(Log.name) private logModel: Model<LogDocument>,
-  ) {}
+  constructor(@InjectModel(Log.name) private logModel: Model<LogDocument>) {}
 
   async log(eventType: LogEventType, payload: LogPayload = {}): Promise<void> {
     try {

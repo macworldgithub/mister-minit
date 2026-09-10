@@ -9,7 +9,8 @@ import { STORE_MAPPING } from '../config/store.mapping';
 @Injectable()
 export class StoreConfigService {
   constructor(
-    @InjectModel(StoreConfig.name) private storeConfigModel: Model<StoreConfigDocument>,
+    @InjectModel(StoreConfig.name)
+    private storeConfigModel: Model<StoreConfigDocument>,
   ) {}
 
   async create(createDto: CreateStoreConfigDto): Promise<StoreConfig> {
@@ -33,7 +34,10 @@ export class StoreConfigService {
     return this.storeConfigModel.findOne({ did }).exec();
   }
 
-  async update(did: string, updateDto: UpdateStoreConfigDto): Promise<StoreConfig> {
+  async update(
+    did: string,
+    updateDto: UpdateStoreConfigDto,
+  ): Promise<StoreConfig> {
     const updated = await this.storeConfigModel
       .findOneAndUpdate({ did }, updateDto, { new: true })
       .exec();
@@ -44,7 +48,9 @@ export class StoreConfigService {
   }
 
   async remove(did: string): Promise<StoreConfig> {
-    const deleted = await this.storeConfigModel.findOneAndDelete({ did }).exec();
+    const deleted = await this.storeConfigModel
+      .findOneAndDelete({ did })
+      .exec();
     if (!deleted) {
       throw new NotFoundException(`Store with did ${did} not found`);
     }
@@ -56,7 +62,7 @@ export class StoreConfigService {
     for (const did of Object.keys(STORE_MAPPING)) {
       const oldStore = STORE_MAPPING[did];
       const existing = await this.storeConfigModel.findOne({ did }).exec();
-      
+
       if (!existing) {
         const newStore = new this.storeConfigModel({
           did: oldStore.did || did,
@@ -68,10 +74,10 @@ export class StoreConfigService {
             {
               name: 'Store Contact',
               mobile: oldStore.staffContact,
-              email: ''
-            }
+              email: '',
+            },
           ],
-          isActive: true
+          isActive: true,
         });
         await newStore.save();
         results.push({ did, status: 'inserted' });

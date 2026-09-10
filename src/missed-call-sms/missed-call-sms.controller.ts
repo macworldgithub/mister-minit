@@ -19,14 +19,13 @@ export class MissedCallSmsController {
     private readonly smsThreadsService: SmsThreadsService,
     private readonly storeConfigService: StoreConfigService,
     private readonly suppressedEventsService: SuppressedEventsService,
-    @InjectModel(SmsThread.name) private readonly smsThreadModel: Model<SmsThreadDocument>,
+    @InjectModel(SmsThread.name)
+    private readonly smsThreadModel: Model<SmsThreadDocument>,
   ) {}
 
   // ── POST /test/missed-call ────────────────────────────────────────────────
   @Post('missed-call')
-  async triggerMissedCall(
-    @Body() body: { fromNo: string; dialNo: string },
-  ) {
+  async triggerMissedCall(@Body() body: { fromNo: string; dialNo: string }) {
     const callId = `test-call-${Date.now()}`;
 
     // FIX 1: from-dn set to a non-numeric extension string so the internal-
@@ -40,7 +39,7 @@ export class MissedCallSmsController {
       'time-end': new Date().toISOString(),
       'reason-terminated': 'src_participant_terminated',
       'from-no': body.fromNo,
-      'from-dn': 'test-ext',          // fixed: not a bare numeric extension
+      'from-dn': 'test-ext', // fixed: not a bare numeric extension
       'dial-no': body.dialNo,
     };
 
@@ -48,7 +47,8 @@ export class MissedCallSmsController {
     await this.missedCallSmsService.handleCdrCreated(mockCdr);
 
     // Always check whether THIS specific call was suppressed
-    const suppressedEvent = await this.suppressedEventsService.findByCallId(callId);
+    const suppressedEvent =
+      await this.suppressedEventsService.findByCallId(callId);
     const suppressedReason = suppressedEvent?.suppressedReason ?? null;
 
     // If this call was suppressed, no new thread was created by this call.
@@ -62,14 +62,15 @@ export class MissedCallSmsController {
     const store = await this.storeConfigService.getStoreByDid(body.dialNo);
 
     // Build opening SMS text only when a thread was actually created
-    const openingSmsText = thread && store ? (
-      `Hi, sorry we missed your call to Mister Minit ${store.storeName}.\n` +
-      `Our hours: ${store.tradingHours}.\n` +
-      `Find us here: ${store.googleMapsLink}\n` +
-      `Is there something we can help with — keys, shoe repairs, ` +
-      `engraving, watches or sharpening?\n` +
-      `Reply STOP to opt out of these messages.`
-    ) : null;
+    const openingSmsText =
+      thread && store
+        ? `Hi, sorry we missed your call to Mister Minit ${store.storeName}.\n` +
+          `Our hours: ${store.tradingHours}.\n` +
+          `Find us here: ${store.googleMapsLink}\n` +
+          `Is there something we can help with — keys, shoe repairs, ` +
+          `engraving, watches or sharpening?\n` +
+          `Reply STOP to opt out of these messages.`
+        : null;
 
     return {
       success: true,
@@ -87,16 +88,16 @@ export class MissedCallSmsController {
 
   // ── POST /test/inbound-sms ────────────────────────────────────────────────
   @Post('inbound-sms')
-  async triggerInboundSms(
-    @Body() body: { from: string; body: string },
-  ) {
+  async triggerInboundSms(@Body() body: { from: string; body: string }) {
     const chatbotResult = await this.missedCallSmsService.handleInboundSms({
       from: body.from,
       body: body.body,
     });
 
     // Fetch updated thread state, even if it was closed by this message
-    const thread = await this.smsThreadsService.findMostRecentThreadAnyStatus(body.from);
+    const thread = await this.smsThreadsService.findMostRecentThreadAnyStatus(
+      body.from,
+    );
 
     return {
       success: true,
@@ -122,9 +123,7 @@ export class MissedCallSmsController {
 
   // ── POST /test/answered-call ──────────────────────────────────────────────
   @Post('answered-call')
-  async triggerAnsweredCall(
-    @Body() body: { fromNo: string; dialNo: string },
-  ) {
+  async triggerAnsweredCall(@Body() body: { fromNo: string; dialNo: string }) {
     const callId = `test-answered-${Date.now()}`;
 
     const mockCdr = {
@@ -142,7 +141,9 @@ export class MissedCallSmsController {
 
     await this.missedCallSmsService.handleCdrCreated(mockCdr);
 
-    const thread = await this.smsThreadsService.findMostRecentByCallerNumber(body.fromNo);
+    const thread = await this.smsThreadsService.findMostRecentByCallerNumber(
+      body.fromNo,
+    );
 
     return {
       success: true,
@@ -152,24 +153,24 @@ export class MissedCallSmsController {
 
   // ── POST /test/backdate-thread ────────────────────────────────────────────
   @Post('backdate-thread')
-  async backdateThread(
-    @Body() body: { fromNo: string; minutesBack?: number },
-  ) {
-    const thread = await this.smsThreadsService.findMostRecentByCallerNumber(body.fromNo);
-    if (!thread) return { success: false, message: 'No thread found' };
-    
-    const backdatedTime = new Date(
-      Date.now() - (body.minutesBack ?? 61) * 60 * 1000
+  async backdateThread(@Body() body: { fromNo: string; minutesBack?: number }) {
+    const thread = await this.smsThreadsService.findMostRecentByCallerNumber(
+      body.fromNo,
     );
-    
+    if (!thread) return { success: false, message: 'No thread found' };
+
+    const backdatedTime = new Date(
+      Date.now() - (body.minutesBack ?? 61) * 60 * 1000,
+    );
+
     await this.smsThreadModel.findByIdAndUpdate((thread as any)._id, {
-      openingSentAt: backdatedTime
+      openingSentAt: backdatedTime,
     });
-    
-    return { 
-      success: true, 
+
+    return {
+      success: true,
       threadId: (thread as any)._id,
-      openingSentAt: backdatedTime 
+      openingSentAt: backdatedTime,
     };
   }
 
@@ -178,21 +179,23 @@ export class MissedCallSmsController {
   async backdateFollowup(
     @Body() body: { fromNo: string; minutesBack?: number },
   ) {
-    const thread = await this.smsThreadsService.findMostRecentByCallerNumber(body.fromNo);
-    if (!thread) return { success: false, message: 'No thread found' };
-    
-    const backdatedTime = new Date(
-      Date.now() - (body.minutesBack ?? 4381) * 60 * 1000
+    const thread = await this.smsThreadsService.findMostRecentByCallerNumber(
+      body.fromNo,
     );
-    
+    if (!thread) return { success: false, message: 'No thread found' };
+
+    const backdatedTime = new Date(
+      Date.now() - (body.minutesBack ?? 4381) * 60 * 1000,
+    );
+
     await this.smsThreadModel.findByIdAndUpdate((thread as any)._id, {
-      followUpSentAt: backdatedTime
+      followUpSentAt: backdatedTime,
     });
-    
+
     return {
       success: true,
       threadId: (thread as any)._id,
-      followUpSentAt: backdatedTime
+      followUpSentAt: backdatedTime,
     };
   }
 

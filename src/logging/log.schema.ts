@@ -19,7 +19,10 @@ export enum LogEventType {
 
 export type LogDocument = Log & Document;
 
-@Schema({ collection: 'logs', timestamps: { createdAt: true, updatedAt: false } })
+@Schema({
+  collection: 'logs',
+  timestamps: { createdAt: true, updatedAt: false },
+})
 export class Log {
   @Prop({ type: String, enum: LogEventType, required: true })
   eventType: LogEventType;

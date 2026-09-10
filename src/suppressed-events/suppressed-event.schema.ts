@@ -12,7 +12,10 @@ export enum SuppressedReason {
 
 export type SuppressedEventDocument = SuppressedEvent & Document;
 
-@Schema({ collection: 'suppressed-events', timestamps: { createdAt: true, updatedAt: false } })
+@Schema({
+  collection: 'suppressed-events',
+  timestamps: { createdAt: true, updatedAt: false },
+})
 export class SuppressedEvent {
   @Prop({ type: String, required: true })
   callerNumber: string;
@@ -36,4 +39,5 @@ export class SuppressedEvent {
   createdAt: Date;
 }
 
-export const SuppressedEventSchema = SchemaFactory.createForClass(SuppressedEvent);
+export const SuppressedEventSchema =
+  SchemaFactory.createForClass(SuppressedEvent);

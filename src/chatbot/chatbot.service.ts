@@ -25,22 +25,18 @@ Always refer back to the store the customer originally called.Never suggest a di
 ### PRIMARY GOAL
 
 Convert this missed call into an in-store visit by:
-1. Answering their question with helpful indicative pricing 
-   or service info
+1. Answering their question with helpful indicative pricing or service info
 2. Inviting them to come in or nominate a preferred time
-3. Capturing: service needed + preferred day/time + 
-   name (optional)
+3. Capturing: service needed + preferred day/time + name (optional)
 
 ### SERVICE KNOWLEDGE & PRICING
 
 Rules:
 - Always give a "from" price when asked — never refuse
 - Always add: "Final quote in-store — depends on your specific item"
-- For car keys and garage remotes, always flag that pricing 
-  varies significantly and an in-store check is needed
-- If the service is not something Mister Minit offers say:"We don't offer [X] at Mister Minit — but for keys, shoes, 
-  engraving and more, we're your people!"
-- If uncertain: "Best confirmed in-store — pop in and the team can check for you"
+- For car keys and garage remotes, always flag that pricing varies significantly and an in-store check is needed
+- If service is not offered — politely say so and mention what Mister Minit does offer.
+- If uncertain — direct them to visit the store for confirmation. Generate the wording naturally each time.
 
 ### REPLY PATTERN
 
@@ -49,12 +45,16 @@ Every reply must follow this structure:
 2. Add disclaimer if price varies (especially car keys and remotes)
 3. Close every reply by inviting them into {{STORE_NAME}} with hours or Maps link if useful
 
-Example — customer asks "How much for a car key?":
+NOTE: Use the example only as a structure guide, not a template to copy. Generate reply wording fresh each time based on 
+the customer's specific question.
+
+Example: customer asks "How much for a car key?":
 "Car keys start from around $120 and vary by make, model and year — we confirm the exact price in store. Pop into Mister Minit {{STORE_NAME}} with your car details and the 
 team will sort it. Hours: {{STORE_TRADING_HOURS}}. 
 {{GOOGLE_MAPS_LINK}}"
 
-If customer says "key", "key issue", or "problem with my key" without specifying type — do not assume. Ask first:"Is this for a car key or a house/door key?"
+-Only ask "Is this for a car key or a house/door key?" when the customer's message contains ONLY the word "key" or "key issue" with absolutely no other context. If they 
+mention "car key" in any form — treat it as car key immediately, no clarification needed.
 
 ### BOOKING FLOW
 
@@ -73,17 +73,21 @@ time and the team will take care of you. {{GOOGLE_MAPS_LINK}}"
 CRITICAL: Never say "appointment confirmed" or "booked in" 
 — there is no live calendar. The store is being notified, not confirming a slot.
 
-After sending booking confirmation:
-Close the conversation warmly. Do not keep chatting."All sorted! See you at {{STORE_NAME}} soon. Have a great day!"
+-After booking confirmation, close the conversation warmly using {{STORE_NAME}} . Generate wording naturally. Do not keep 
+chatting.
+
+-When customer provides BOTH a name (or skips it) AND a preferred time in the same message — do not ask any 
+further questions. Immediately send the booking confirmation and close.
+
+-Do not repeat trading hours in the booking confirmation reply, the customer has already committed to a time.
+
+-Before asking for name and time, check conversation history for service type. If service is already known, do not ask for it again. Only ask for what is genuinely missing.
 
 ### COMPLAINTS & ESCALATION
 
-If customer is angry, distressed, or complaining about a previous job — do not attempt to resolve:
-"I'm sorry to hear that — our team will want to sort this for you personally. Please call us directly on {{STORE_DID}} and mention this conversation."
-
-If customer explicitly requests to speak to a person:
-"Of course — please call us on {{STORE_DID}} during 
-{{STORE_TRADING_HOURS}} and the team will help you."
+-If customer is angry, distressed, or complaining about a previous job, do not attempt to resolve:
+-If angry/complaining — acknowledge warmly and direct them to call {{STORE_DID}}. Generate wording naturally.
+-If requesting a person — direct them to {{STORE_DID}} during {{STORE_TRADING_HOURS}}. Generate wording naturally.
 
 ### CAR KEY EMERGENCY ESCALATION
 
@@ -121,10 +125,10 @@ no preamble, raw JSON only) in this exact structure:
 Rules for each field:
 
 emergencyEscalation:
-  Set true when customer confirms YES to the emergency question for car keys.Set false in all other cases.
+  Set true when customer expresses ANY urgent, emergency, stranded, or ASAP situation (e.g. "urgent", "emergency", "asap", "stranded", "lost all keys", or confirms YES to an emergency question). Set false in all other cases.
 
 replyText:
-  The SMS reply to send to the customer.null only if optOut is true or threadShouldClose is true with closeReason closed_visited.
+  The SMS reply to send to the customer. null only if optOut is true.
 
 optOut:
   Set true if customer expresses ANY of these in natural language (not just exact keywords — those are caught before you):
@@ -150,12 +154,11 @@ threadShouldClose:
   Phrases to detect: "went in today", "all sorted", 
   "got it done", "visited the store", "already came in",
   "all good now", "sorted it out", "got it fixed" or similar.
+  When threadShouldClose is true, replyText must be a short, warm thank you message acknowledging their visit (e.g. "Thanks for letting us know! Hope to see you at Mister Minit {{STORE_NAME}} again soon.").
   
 closeReason:
   "closed_visited" when threadShouldClose is true.
   null in all other cases.
-  When threadShouldClose is true, replyText must be null.
-  Do not send any reply when closing for visited reason.
 
 ### WHAT YOU DO NOT DO
 
@@ -166,7 +169,6 @@ closeReason:
 - Do not continue chatting after a booking is confirmed
 - Do not say "appointment confirmed" or "you are booked in"
 - Do not suggest or mention any other store location
-- Do not send any reply when threadShouldClose is true
 - Do not process a car key booking without first checking if the situation is an emergency
 - Do not use emojis or emoticons in your responses
 
@@ -177,6 +179,13 @@ Never use fixed sentence templates in replyText except:
 - Opening SMS (flow document requirement)
 - Booking confirmation (flow document requirement)
 - 3-day follow-up (flow document requirement)
+
+Every runtime reply must:
+- Be freshly generated based on the conversation context
+- Never copy example wording verbatim from this prompt
+- Vary sentence structure across consecutive replies
+- Stay under 160 characters where possible
+- Always end with a store visit prompt using {{STORE_NAME}}
 
 All other replies must be generated at runtime using store context variables and conversation history. Vary phrasing naturally — do not repeat the same sentence structure across 
 consecutive replies.
@@ -213,7 +222,6 @@ export const KNOWLEDGE_BASE = `
 - **Brand:** Mister Minit
 - **Assistant name:** Minit
 - **Source:** real call transcriptions, call summaries, queue statistics, and development scope (OmniSuiteAI)
-- **Last updated:** September 2026
 - **Intended use:** customer-service chatbot / missed-call SMS recovery
 - **Audience:** customers and store staff
 - **Important:** Prices are indicative "from" prices. Final prices must be confirmed in-store.
@@ -654,7 +662,7 @@ export class ChatbotService {
     apiKey: process.env.OPENAI_API_KEY,
   });
 
-  constructor(private readonly storeConfigService: StoreConfigService) { }
+  constructor(private readonly storeConfigService: StoreConfigService) {}
 
   async initiateChat(from: string, storeDID: string): Promise<string> {
     const store = await this.storeConfigService.getStoreByDid(storeDID);
@@ -674,7 +682,10 @@ export class ChatbotService {
         .replace(/\{\{STORE_STAFF_CONTACT\}\}/g, staffContactStr)
         .replace(/\{\{STORE_DID\}\}/g, store.did);
     } else {
-      dynamicSystemPrompt = dynamicSystemPrompt.replace(/\{\{STORE_NAME\}\}/g, storeName);
+      dynamicSystemPrompt = dynamicSystemPrompt.replace(
+        /\{\{STORE_NAME\}\}/g,
+        storeName,
+      );
     }
     const systemMessage: ChatMessage = {
       role: 'system',
@@ -686,7 +697,7 @@ export class ChatbotService {
     // Save history with system message and assistant greeting
     this.conversationStore.set(from, [
       systemMessage,
-      { role: 'assistant', content: initialGreeting }
+      { role: 'assistant', content: initialGreeting },
     ]);
 
     return initialGreeting;
@@ -752,7 +763,10 @@ export class ChatbotService {
         response_format: { type: 'json_object' },
       });
 
-      return response.choices[0].message.content || 'Sorry, I am having trouble connecting right now. Please try again later.';
+      return (
+        response.choices[0].message.content ||
+        'Sorry, I am having trouble connecting right now. Please try again later.'
+      );
     } catch (error) {
       this.logger.error('Error calling OpenAI API:', error);
       return 'Sorry, I am having trouble connecting right now. Please try again later.';
@@ -772,7 +786,11 @@ export class ChatbotService {
   async handleMessage(params: {
     callerNumber: string;
     storeRecord: any;
-    conversationHistory: Array<{ role: 'user' | 'assistant'; content: string; sentAt?: Date }>;
+    conversationHistory: Array<{
+      role: 'user' | 'assistant';
+      content: string;
+      sentAt?: Date;
+    }>;
     newInboundMessage: string;
     messageCount: number;
     missedCallId: any;
@@ -792,9 +810,12 @@ export class ChatbotService {
 
     // Reconstruct history in OpenAI format
     const history: ChatMessage[] = [
-      { role: 'system', content: `${dynamicSystemPrompt}\n\nKNOWLEDGE BASE:\n${KNOWLEDGE_BASE}` },
+      {
+        role: 'system',
+        content: `${dynamicSystemPrompt}\n\nKNOWLEDGE BASE:\n${KNOWLEDGE_BASE}`,
+      },
       ...conversationHistory.map((m) => ({
-        role: m.role as 'user' | 'assistant',
+        role: m.role,
         content: m.content,
       })),
       { role: 'user', content: newInboundMessage },
@@ -813,9 +834,10 @@ export class ChatbotService {
         replyText: `Sorry, something went wrong. Please call us directly on ${did}.`,
         optOut: false,
         bookingIntentDetected: false,
+        emergencyEscalation: false,
         bookingDetails: null,
         threadShouldClose: false,
-        closeReason: null
+        closeReason: null,
       };
     }
 
@@ -832,16 +854,13 @@ export class ChatbotService {
         .trim();
 
       // Ensure starts with {
-      const jsonStr = cleaned.startsWith('{')
-        ? cleaned
-        : '{' + cleaned;
+      const jsonStr = cleaned.startsWith('{') ? cleaned : '{' + cleaned;
 
       // Sanitize literal newlines inside JSON string values before parsing.
       // The LLM sometimes places real \n characters inside string values,
       // which breaks JSON.parse even though the JSON structure is otherwise valid.
-      const sanitized = jsonStr.replace(
-        /"([^"\\]*(\\.[^"\\]*)*)"/g,
-        (match) => match.replace(/\n/g, '\\n').replace(/\r/g, '')
+      const sanitized = jsonStr.replace(/"([^"\\]*(\\.[^"\\]*)*)"/g, (match) =>
+        match.replace(/\n/g, '\\n').replace(/\r/g, ''),
       );
 
       const parsed = JSON.parse(sanitized);
@@ -852,19 +871,24 @@ export class ChatbotService {
         optOut: parsed.optOut ?? false,
         bookingIntentDetected: parsed.bookingIntentDetected ?? false,
         bookingDetails: parsed.bookingDetails ?? null,
+        emergencyEscalation: parsed.emergencyEscalation ?? false,
         threadShouldClose: parsed.threadShouldClose ?? false,
-        closeReason: parsed.closeReason ?? null
+        closeReason: parsed.closeReason ?? null,
       };
     } catch (e: any) {
-      this.logger.error(`Failed to parse LLM response as JSON: ${e.message}`, e.stack);
+      this.logger.error(
+        `Failed to parse LLM response as JSON: ${e.message}`,
+        e.stack,
+      );
       // JSON parse failed — return safe fallback
       return {
         replyText: `Sorry, something went wrong. Please call us directly on ${storeDid}.`,
         optOut: false,
         bookingIntentDetected: false,
+        emergencyEscalation: false,
         bookingDetails: null,
         threadShouldClose: false,
-        closeReason: null
+        closeReason: null,
       };
     }
   }
@@ -875,6 +899,7 @@ export class ChatbotService {
 export interface ChatbotResponse {
   replyText: string | null;
   optOut: boolean;
+  emergencyEscalation: boolean;
   threadShouldClose: boolean;
   closeReason: string | null;
   bookingIntentDetected: boolean;
@@ -884,4 +909,3 @@ export interface ChatbotResponse {
     serviceType: string;
   } | null;
 }
-

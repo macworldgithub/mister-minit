@@ -13,6 +13,7 @@ import { OptOutModule } from './opt-out/opt-out.module';
 import { SuppressedEventsModule } from './suppressed-events/suppressed-events.module';
 import { SmsThreadsModule } from './sms-threads/sms-threads.module';
 import { MissedCallSmsModule } from './missed-call-sms/missed-call-sms.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -36,8 +37,9 @@ import { MissedCallSmsModule } from './missed-call-sms/missed-call-sms.module';
     CdrModule,
     ChatbotModule,
     StoreConfigModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

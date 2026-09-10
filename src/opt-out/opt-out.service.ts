@@ -23,9 +23,7 @@ export class OptOutService {
    * Indexed lookup — O(log n).
    */
   async isOptedOut(callerNumber: string): Promise<boolean> {
-    const exists = await this.optOutModel
-      .exists({ callerNumber })
-      .exec();
+    const exists = await this.optOutModel.exists({ callerNumber }).exec();
     return exists !== null;
   }
 

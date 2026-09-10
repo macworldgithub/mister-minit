@@ -21,7 +21,10 @@ export class ChatbotController {
     if (!payload.from || !payload.storeDID) {
       return { status: 'ignored', reason: 'Invalid payload' };
     }
-    const greeting = await this.chatbotService.initiateChat(payload.from, payload.storeDID);
+    const greeting = await this.chatbotService.initiateChat(
+      payload.from,
+      payload.storeDID,
+    );
     return { status: 'initiated', greeting };
   }
 
@@ -32,7 +35,10 @@ export class ChatbotController {
       return { status: 'ignored', reason: 'Invalid payload' };
     }
 
-    const reply = await this.chatbotService.handleIncomingMessage(payload.from, payload.text);
+    const reply = await this.chatbotService.handleIncomingMessage(
+      payload.from,
+      payload.text,
+    );
     return { status: 'received', reply };
   }
 }

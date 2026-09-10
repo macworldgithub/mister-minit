@@ -2,18 +2,23 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ConfigService } from '@nestjs/config';
 
 import { StoreConfigService } from '../store-config/store-config.service';
 import { StoreConfig } from '../store-config/store-config.schema';
 import { SmsThreadsService } from '../sms-threads/sms-threads.service';
 import { ThreadStatus } from '../sms-threads/sms-thread.schema';
 import { OptOutService } from '../opt-out/opt-out.service';
-import { SuppressedEventsService, SuppressPayload } from '../suppressed-events/suppressed-events.service';
+import {
+  SuppressedEventsService,
+  SuppressPayload,
+} from '../suppressed-events/suppressed-events.service';
 import { SuppressedReason } from '../suppressed-events/suppressed-event.schema';
 import { LoggingService } from '../logging/logging.service';
 import { LogEventType } from '../logging/log.schema';
 import { ChatbotService } from '../chatbot/chatbot.service';
 import { SmsProviderService } from './sms-provider.service';
+import { MailService } from '../mail/mail.service';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,7 +46,12 @@ export interface InboundSmsPayload {
 const MOBILE_REGEX = /^(\+614|04)\d{8}$/;
 const INTERNAL_EXTENSION_REGEX = /^\d{1,5}$/;
 const OPT_OUT_KEYWORDS = new Set([
-  'STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT',
+  'STOP',
+  'STOPALL',
+  'UNSUBSCRIBE',
+  'CANCEL',
+  'END',
+  'QUIT',
 ]);
 const DEDUP_WINDOW_MS = 60 * 60 * 1000; // 60 minutes
 const MAX_SMS_RETRIES = 3;
@@ -61,6 +71,8 @@ export class MissedCallSmsService {
     private readonly chatbotService: ChatbotService,
     private readonly smsProviderService: SmsProviderService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly mailService: MailService,
+    private readonly configService: ConfigService,
   ) {}
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -104,7 +116,10 @@ export class MissedCallSmsService {
     if (!isMissedCall) {
       const totalSecs = this.parseDurationToSeconds(duration);
       if (totalSecs >= 10 && MOBILE_REGEX.test(fromNo)) {
-        const activeThread = await this.smsThreadsService.findActiveThread(fromNo, storeId);
+        const activeThread = await this.smsThreadsService.findActiveThread(
+          fromNo,
+          storeId,
+        );
         if (activeThread) {
           await this.smsThreadsService.closeThread(
             (activeThread as any)._id.toString(),
@@ -196,7 +211,10 @@ export class MissedCallSmsService {
 
     // ── Step 6: 60-min dedup ───────────────────────────────────────────────
     let threadId: string;
-    const existingThread = await this.smsThreadsService.findActiveThread(fromNo, storeId);
+    const existingThread = await this.smsThreadsService.findActiveThread(
+      fromNo,
+      storeId,
+    );
 
     if (existingThread) {
       const openingSentAt = existingThread.openingSentAt;
@@ -278,12 +296,12 @@ export class MissedCallSmsService {
     const keyword = body.trim().toUpperCase();
     if (OPT_OUT_KEYWORDS.has(keyword)) {
       await this.handleKeywordOptOut(from, keyword);
-      return { 
-        optOut: true, 
+      return {
+        optOut: true,
         source: 'keyword',
         replyText: this.buildOptOutConfirmation(),
         threadShouldClose: true,
-        closeReason: ThreadStatus.CLOSED_OPTED_OUT
+        closeReason: ThreadStatus.CLOSED_OPTED_OUT,
       };
     }
 
@@ -291,7 +309,9 @@ export class MissedCallSmsService {
     // We need storeId — find the most recent thread for this number
     const recentThread = await this.findMostRecentThreadForCaller(from);
     if (!recentThread) {
-      this.logger.warn(`Inbound SMS from ${from} — no active thread found. Discarding.`);
+      this.logger.warn(
+        `Inbound SMS from ${from} — no active thread found. Discarding.`,
+      );
       await this.loggingService.log(LogEventType.INBOUND_SMS_RECEIVED, {
         callerNumber: from,
         metadata: { discarded: true, reason: 'no_active_thread' },
@@ -310,7 +330,7 @@ export class MissedCallSmsService {
     const chatbotResponse = await this.chatbotService.handleMessage({
       callerNumber: from,
       storeRecord: store,
-      conversationHistory: recentThread.conversationHistory as any[],
+      conversationHistory: recentThread.conversationHistory,
       newInboundMessage: body,
       messageCount: recentThread.messageCount,
       missedCallId: (recentThread as any)._id,
@@ -327,8 +347,15 @@ export class MissedCallSmsService {
         source: 'llm_detected',
         threadId,
       });
-      await this.sendWithRetry(from, this.buildOptOutConfirmation(), MAX_SMS_RETRIES);
-      await this.smsThreadsService.closeThread(threadId, ThreadStatus.CLOSED_OPTED_OUT);
+      await this.sendWithRetry(
+        from,
+        this.buildOptOutConfirmation(),
+        MAX_SMS_RETRIES,
+      );
+      await this.smsThreadsService.closeThread(
+        threadId,
+        ThreadStatus.CLOSED_OPTED_OUT,
+      );
       await this.loggingService.log(LogEventType.OPT_OUT_RECEIVED, {
         callerNumber: from,
         storeId,
@@ -339,9 +366,33 @@ export class MissedCallSmsService {
       return { ...chatbotResponse, threadId };
     }
 
-    // Customer has visited — close silently, no reply
-    if (chatbotResponse.threadShouldClose && chatbotResponse.closeReason === ThreadStatus.CLOSED_VISITED) {
-      await this.smsThreadsService.closeThread(threadId, ThreadStatus.CLOSED_VISITED);
+    // Customer has visited — send thank you reply, append to history, then close thread
+    if (
+      chatbotResponse.threadShouldClose &&
+      chatbotResponse.closeReason === ThreadStatus.CLOSED_VISITED
+    ) {
+      if (chatbotResponse.replyText) {
+        await this.sendWithRetry(
+          from,
+          chatbotResponse.replyText,
+          MAX_SMS_RETRIES,
+        );
+        await this.smsThreadsService.appendToHistory(threadId, {
+          role: 'user',
+          content: body,
+          sentAt: new Date(),
+        });
+        await this.smsThreadsService.appendToHistory(threadId, {
+          role: 'assistant',
+          content: chatbotResponse.replyText,
+          sentAt: new Date(),
+        });
+      }
+
+      await this.smsThreadsService.closeThread(
+        threadId,
+        ThreadStatus.CLOSED_VISITED,
+      );
       await this.loggingService.log(LogEventType.THREAD_CLOSED, {
         callerNumber: from,
         storeId,
@@ -353,7 +404,10 @@ export class MissedCallSmsService {
     }
 
     // Booking captured
-    if (chatbotResponse.bookingIntentDetected && chatbotResponse.bookingDetails) {
+    if (
+      chatbotResponse.bookingIntentDetected &&
+      chatbotResponse.bookingDetails
+    ) {
       const bd = chatbotResponse.bookingDetails;
       await this.smsThreadsService.saveBooking(threadId, bd);
 
@@ -361,18 +415,49 @@ export class MissedCallSmsService {
       const confirmBody = this.buildBookingConfirmation(store, bd);
       await this.sendWithRetry(from, confirmBody, MAX_SMS_RETRIES);
 
-      // Notify each staff contact
+      // Notify each staff contact via SMS & Email (always)
+      // If this is also an emergency escalation, mark it URGENT in subject/body
+      const isUrgent = chatbotResponse.emergencyEscalation === true;
+      let staffEmails = (store?.staffContacts || [])
+        .filter((c) => c.email && c.email.trim() !== '')
+        .map((c) => c.email as string);
+
+      // Fallback: If store staff contact has no email configured, use SMTP_USER or DEFAULT_NOTIFICATION_EMAIL
+      if (staffEmails.length === 0) {
+        const fallbackEmail =
+          this.configService.get<string>('DEFAULT_NOTIFICATION_EMAIL') ||
+          this.configService.get<string>('SMTP_USER');
+        if (fallbackEmail) {
+          staffEmails = [fallbackEmail];
+          this.logger.log(
+            `No staff email configured for store "${store?.storeName}". Using fallback notification email: ${fallbackEmail}`,
+          );
+        }
+      }
+
+      const emailSubject = isUrgent
+        ? `⚠️ URGENT — New Booking Request — Mister Minit ${store?.storeName || ''}`
+        : `New Booking Request — Mister Minit ${store?.storeName || ''}`;
+
+      const urgentNote = isUrgent
+        ? `🚨 URGENT: Customer confirmed an emergency situation — contact immediately.\n\n`
+        : '';
+
+      const emailBody =
+        `${urgentNote}New booking request — Mister Minit ${store?.storeName || ''}\n` +
+        `Customer: ${bd.customerName ?? 'Not provided'}\n` +
+        `Mobile: ${from}\n` +
+        `Service: ${bd.serviceType}\n` +
+        `Preferred time: ${bd.preferredTime}`;
+
+      if (staffEmails.length > 0) {
+        this.mailService.sendEmail(staffEmails, emailSubject, emailBody);
+      }
+
       if (store?.staffContacts?.length) {
-        store.staffContacts.forEach(contact => {
+        store.staffContacts.forEach((contact) => {
           if (contact.mobile) {
-            this.smsProviderService.sendSms(
-              contact.mobile,
-              `New booking request — Mister Minit ${store.storeName}\n` +
-              `Customer: ${bd.customerName ?? 'Not provided'}\n` +
-              `Mobile: ${from}\n` +
-              `Service: ${bd.serviceType}\n` +
-              `Preferred time: ${bd.preferredTime}`
-            );
+            this.smsProviderService.sendSms(contact.mobile, emailBody);
           }
         });
       }
@@ -382,7 +467,10 @@ export class MissedCallSmsService {
         storeId,
         storeName,
         threadId,
-        metadata: { bookingDetails: bd },
+        metadata: {
+          bookingDetails: bd,
+          emergencyEscalation: chatbotResponse.emergencyEscalation,
+        },
       });
       await this.loggingService.log(LogEventType.STAFF_NOTIFIED, {
         callerNumber: from,
@@ -395,7 +483,11 @@ export class MissedCallSmsService {
 
     // Normal reply
     if (chatbotResponse.replyText) {
-      await this.sendWithRetry(from, chatbotResponse.replyText, MAX_SMS_RETRIES);
+      await this.sendWithRetry(
+        from,
+        chatbotResponse.replyText,
+        MAX_SMS_RETRIES,
+      );
 
       await this.smsThreadsService.appendToHistory(threadId, {
         role: 'user',
@@ -431,7 +523,8 @@ export class MissedCallSmsService {
     this.logger.log('Follow-up scheduler tick');
 
     // ── Step 1: Send follow-ups ────────────────────────────────────────────
-    const followUpThreads = await this.smsThreadsService.findThreadsForFollowUp();
+    const followUpThreads =
+      await this.smsThreadsService.findThreadsForFollowUp();
     this.logger.log(`Follow-up candidates: ${followUpThreads.length}`);
 
     for (const thread of followUpThreads) {
@@ -441,12 +534,18 @@ export class MissedCallSmsService {
       try {
         // Check opt-out
         if (await this.optOutService.isOptedOut(thread.callerNumber)) {
-          await this.smsThreadsService.closeThread(threadId, ThreadStatus.CLOSED_OPTED_OUT);
+          await this.smsThreadsService.closeThread(
+            threadId,
+            ThreadStatus.CLOSED_OPTED_OUT,
+          );
           await this.loggingService.log(LogEventType.THREAD_CLOSED, {
             callerNumber: thread.callerNumber,
             storeId,
             threadId,
-            metadata: { closeReason: ThreadStatus.CLOSED_OPTED_OUT, trigger: 'follow_up_scheduler' },
+            metadata: {
+              closeReason: ThreadStatus.CLOSED_OPTED_OUT,
+              trigger: 'follow_up_scheduler',
+            },
           });
           continue;
         }
@@ -465,7 +564,10 @@ export class MissedCallSmsService {
           threadId,
         });
       } catch (err: any) {
-        this.logger.error(`Follow-up failed for thread ${threadId}: ${err.message}`, err.stack);
+        this.logger.error(
+          `Follow-up failed for thread ${threadId}: ${err.message}`,
+          err.stack,
+        );
       }
     }
 
@@ -478,7 +580,10 @@ export class MissedCallSmsService {
       const storeId = thread.storeId.toString();
 
       try {
-        await this.smsThreadsService.closeThread(threadId, ThreadStatus.CLOSED_NO_RESPONSE);
+        await this.smsThreadsService.closeThread(
+          threadId,
+          ThreadStatus.CLOSED_NO_RESPONSE,
+        );
         await this.loggingService.log(LogEventType.THREAD_CLOSED, {
           callerNumber: thread.callerNumber,
           storeId,
@@ -486,7 +591,10 @@ export class MissedCallSmsService {
           metadata: { closeReason: ThreadStatus.CLOSED_NO_RESPONSE },
         });
       } catch (err: any) {
-        this.logger.error(`Auto-close failed for thread ${threadId}: ${err.message}`, err.stack);
+        this.logger.error(
+          `Auto-close failed for thread ${threadId}: ${err.message}`,
+          err.stack,
+        );
       }
     }
   }
@@ -515,17 +623,26 @@ export class MissedCallSmsService {
     try {
       await this.suppressedEventsService.suppress(payload);
     } catch (err: any) {
-      this.logger.error(`Failed to record suppression: ${err.message}`, err.stack);
+      this.logger.error(
+        `Failed to record suppression: ${err.message}`,
+        err.stack,
+      );
     }
   }
 
-  private async sendWithRetry(to: string, body: string, maxAttempts: number): Promise<boolean> {
+  private async sendWithRetry(
+    to: string,
+    body: string,
+    maxAttempts: number,
+  ): Promise<boolean> {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const ok = await this.smsProviderService.sendSms(to, body);
         if (ok) return true;
       } catch (err: any) {
-        this.logger.warn(`SMS attempt ${attempt}/${maxAttempts} failed to ${to}: ${err.message}`);
+        this.logger.warn(
+          `SMS attempt ${attempt}/${maxAttempts} failed to ${to}: ${err.message}`,
+        );
       }
     }
     this.logger.error(`All ${maxAttempts} SMS attempts failed for ${to}`);
@@ -541,7 +658,10 @@ export class MissedCallSmsService {
     return this.smsThreadsService.findMostRecentByCallerNumber(callerNumber);
   }
 
-  private async handleKeywordOptOut(from: string, keyword: string): Promise<void> {
+  private async handleKeywordOptOut(
+    from: string,
+    keyword: string,
+  ): Promise<void> {
     // Find most recent thread to get storeId/threadId
     const thread = await this.findMostRecentThreadForCaller(from);
     const threadId = thread ? (thread as any)._id.toString() : '';
@@ -554,10 +674,17 @@ export class MissedCallSmsService {
       source: 'keyword',
       threadId,
     });
-    await this.sendWithRetry(from, this.buildOptOutConfirmation(), MAX_SMS_RETRIES);
+    await this.sendWithRetry(
+      from,
+      this.buildOptOutConfirmation(),
+      MAX_SMS_RETRIES,
+    );
 
     if (threadId) {
-      await this.smsThreadsService.closeThread(threadId, ThreadStatus.CLOSED_OPTED_OUT);
+      await this.smsThreadsService.closeThread(
+        threadId,
+        ThreadStatus.CLOSED_OPTED_OUT,
+      );
     }
 
     await this.loggingService.log(LogEventType.OPT_OUT_RECEIVED, {
@@ -583,7 +710,8 @@ export class MissedCallSmsService {
   }
 
   private buildFollowUpSms(store: StoreConfig | null): string {
-    if (!store) return 'Hi, just checking in from Mister Minit — did you make it into the store?';
+    if (!store)
+      return 'Hi, just checking in from Mister Minit — did you make it into the store?';
     return (
       `Hi, just checking in from Mister Minit ${store.storeName} — ` +
       `did you make it into the store, or is there anything ` +
@@ -610,7 +738,11 @@ export class MissedCallSmsService {
     );
   }
 
-  private buildStaffNotification(store: StoreConfig, callerNumber: string, bd: any): string {
+  private buildStaffNotification(
+    store: StoreConfig,
+    callerNumber: string,
+    bd: any,
+  ): string {
     return (
       `New booking request — Mister Minit ${store.storeName}\n` +
       `Customer: ${bd.customerName || 'Not provided'}\n` +

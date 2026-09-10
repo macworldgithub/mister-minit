@@ -3,7 +3,10 @@ import { Document } from 'mongoose';
 
 export type OptOutDocument = OptOut & Document;
 
-@Schema({ collection: 'opt-outs', timestamps: { createdAt: true, updatedAt: false } })
+@Schema({
+  collection: 'opt-outs',
+  timestamps: { createdAt: true, updatedAt: false },
+})
 export class OptOut {
   @Prop({ type: String, required: true, index: true })
   callerNumber: string;

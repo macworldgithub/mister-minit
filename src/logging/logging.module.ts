@@ -5,9 +5,7 @@ import { LoggingService } from './logging.service';
 
 @Global()
 @Module({
-  imports: [
-    MongooseModule.forFeature([{ name: Log.name, schema: LogSchema }]),
-  ],
+  imports: [MongooseModule.forFeature([{ name: Log.name, schema: LogSchema }])],
   providers: [LoggingService],
   exports: [LoggingService],
 })

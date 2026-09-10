@@ -34,7 +34,8 @@ export class ConversationEntry {
   @Prop({ type: Date, required: true })
   sentAt: Date;
 }
-export const ConversationEntrySchema = SchemaFactory.createForClass(ConversationEntry);
+export const ConversationEntrySchema =
+  SchemaFactory.createForClass(ConversationEntry);
 
 @Schema({ _id: false })
 export class BookingDetails {
@@ -47,7 +48,8 @@ export class BookingDetails {
   @Prop({ type: String, default: null })
   serviceType: string;
 }
-export const BookingDetailsSchema = SchemaFactory.createForClass(BookingDetails);
+export const BookingDetailsSchema =
+  SchemaFactory.createForClass(BookingDetails);
 
 // ─── Main Document ────────────────────────────────────────────────────────────
 
@@ -67,7 +69,11 @@ export class SmsThread {
   @Prop({ type: String, required: true })
   did: string;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'StoreConfig', required: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'StoreConfig',
+    required: true,
+  })
   storeId: Types.ObjectId;
 
   @Prop({

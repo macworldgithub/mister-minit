@@ -1,4 +1,9 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -21,7 +26,9 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     this.server = net.createServer((socket) => {
-      this.logger.log(`Client connected from ${socket.remoteAddress}:${socket.remotePort}`);
+      this.logger.log(
+        `Client connected from ${socket.remoteAddress}:${socket.remotePort}`,
+      );
 
       let buffer = '';
 
@@ -32,7 +39,9 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
       socket.setTimeout(SOCKET_TIMEOUT);
 
       socket.on('timeout', () => {
-        this.logger.warn(`Socket timeout after ${SOCKET_TIMEOUT}ms. Destroying socket for ${socket.remoteAddress}`);
+        this.logger.warn(
+          `Socket timeout after ${SOCKET_TIMEOUT}ms. Destroying socket for ${socket.remoteAddress}`,
+        );
         socket.destroy();
       });
 
@@ -41,7 +50,9 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
 
         // Buffer size limit guard to prevent memory DOS
         if (buffer.length > MAX_BUFFER_SIZE) {
-          this.logger.error(`Buffer size exceeded limit (${MAX_BUFFER_SIZE} bytes). Destroying socket for ${socket.remoteAddress}`);
+          this.logger.error(
+            `Buffer size exceeded limit (${MAX_BUFFER_SIZE} bytes). Destroying socket for ${socket.remoteAddress}`,
+          );
           socket.destroy();
           return;
         }
@@ -119,7 +130,9 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
 
       // Expected format length is around 9. If significantly smaller, it's malformed.
       if (fields.length < 5) {
-        this.logger.warn(`Received malformed CDR data (too few fields): ${rawData}`);
+        this.logger.warn(
+          `Received malformed CDR data (too few fields): ${rawData}`,
+        );
         return;
       }
 
@@ -141,7 +154,10 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
 
       // 1. Asynchronous Persistence to MongoDB
       const savedDocument = await this.saveCdr(dto).catch((err) => {
-        this.logger.error(`Failed to persist CDR [${dto.callid}]: ${err.message}`, err.stack);
+        this.logger.error(
+          `Failed to persist CDR [${dto.callid}]: ${err.message}`,
+          err.stack,
+        );
         return null;
       });
 
@@ -151,9 +167,11 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
 
       // 2. Business Logic Execution
       this.executeBusinessLogic(dto);
-
     } catch (err: any) {
-      this.logger.error(`Unexpected error processing CDR line: ${err.message}`, err.stack);
+      this.logger.error(
+        `Unexpected error processing CDR line: ${err.message}`,
+        err.stack,
+      );
     }
   }
 
@@ -161,11 +179,13 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
     if (!dto.timestamp) {
       dto.timestamp = new Date().toISOString();
     }
-    return this.cdrModel.findOneAndUpdate(
-      { callid: dto.callid },
-      { $set: dto },
-      { upsert: true, new: true }
-    ).exec();
+    return this.cdrModel
+      .findOneAndUpdate(
+        { callid: dto.callid },
+        { $set: dto },
+        { upsert: true, new: true },
+      )
+      .exec();
   }
 
   private executeBusinessLogic(cdr: any) {
@@ -184,6 +204,8 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async triggerMissedCallSMS(customerNumber: string, storeDID: string) {
-    this.logger.log(`[SMS TRIGGER] Missed call detected! From: ${customerNumber}, To: ${storeDID}`);
+    this.logger.log(
+      `[SMS TRIGGER] Missed call detected! From: ${customerNumber}, To: ${storeDID}`,
+    );
   }
 }
