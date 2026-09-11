@@ -174,6 +174,26 @@
     display: none;
     background: #fafafa;
   }
+  .typing-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 12px 16px;
+  }
+  .typing-indicator span {
+    width: 7px;
+    height: 7px;
+    background-color: var(--text-muted);
+    border-radius: 50%;
+    display: inline-block;
+    animation: typingBounce 1.4s infinite ease-in-out both;
+  }
+  .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+  .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+  @keyframes typingBounce {
+    0%, 80%, 100% { transform: scale(0.4); opacity: 0.3; }
+    40% { transform: scale(1); opacity: 1; }
+  }
 </style>
 </head>
 <body>
@@ -189,6 +209,7 @@
     <select id="storeSelect">
       <option value="">Loading stores...</option>
     </select>
+    <div id="didInfo" style="font-size: 0.8rem; color: var(--text-muted); margin-top: -6px;">DID: -</div>
 
     <label for="phoneInput">Customer Phone</label>
     <input type="text" id="phoneInput" value="0401000099">
@@ -214,6 +235,7 @@
 
 <script>
   const storeSelect = document.getElementById('storeSelect');
+  const didInfo = document.getElementById('didInfo');
   const phoneInput = document.getElementById('phoneInput');
   const startBtn = document.getElementById('startBtn');
   const chatWindow = document.getElementById('chatWindow');
@@ -223,6 +245,13 @@
   const inputArea = document.getElementById('inputArea');
   const resetArea = document.getElementById('resetArea');
   const statusMessage = document.getElementById('statusMessage');
+
+  function updateDidDisplay() {
+    const selectedDid = storeSelect.value;
+    didInfo.textContent = selectedDid ? `Store DID: ${selectedDid}` : 'DID: -';
+  }
+
+  storeSelect.addEventListener('change', updateDidDisplay);
 
   async function loadStores() {
     try {
@@ -234,9 +263,10 @@
       stores.forEach(store => {
         const option = document.createElement('option');
         option.value = store.did;
-        option.textContent = store.storeName;
+        option.textContent = store.did ? `${store.storeName} (${store.did})` : store.storeName;
         storeSelect.appendChild(option);
       });
+      updateDidDisplay();
     } catch (err) {
       console.error(err);
       storeSelect.innerHTML = '<option value="">Error loading stores</option>';
@@ -297,6 +327,11 @@
     startBtn.disabled = true;
     startBtn.textContent = 'Starting...';
 
+    setupPanel.style.display = 'none';
+    resetArea.style.display = 'block';
+    enableChat();
+    showTypingIndicator();
+
     try {
       const res = await fetch('/test/missed-call', {
         method: 'POST',
@@ -304,12 +339,9 @@
         body: JSON.stringify({ fromNo: phone, dialNo: did })
       });
       const data = await res.json();
+      hideTypingIndicator();
 
       if (!res.ok || !data.success) throw new Error('API error');
-
-      setupPanel.style.display = 'none';
-      resetArea.style.display = 'block';
-      enableChat();
       
       if (data.result && data.result.openingSmsText) {
         addMessage('ai', data.result.openingSmsText);
@@ -318,12 +350,37 @@
       }
 
     } catch (err) {
+      hideTypingIndicator();
       console.error(err);
       addMessage('error', 'Error starting conversation: ' + err.message);
+      setupPanel.style.display = 'flex';
+      resetArea.style.display = 'none';
       startBtn.disabled = false;
       startBtn.textContent = 'Start Conversation';
     }
   });
+
+  let typingIndicatorEl = null;
+
+  function showTypingIndicator() {
+    if (typingIndicatorEl) return;
+    typingIndicatorEl = document.createElement('div');
+    typingIndicatorEl.className = 'message ai';
+    typingIndicatorEl.innerHTML = `
+      <div class="bubble typing-indicator">
+        <span></span><span></span><span></span>
+      </div>
+    `;
+    chatWindow.appendChild(typingIndicatorEl);
+    scrollToBottom();
+  }
+
+  function hideTypingIndicator() {
+    if (typingIndicatorEl) {
+      typingIndicatorEl.remove();
+      typingIndicatorEl = null;
+    }
+  }
 
   async function sendMessage() {
     const text = messageInput.value.trim();
@@ -332,6 +389,7 @@
 
     messageInput.value = '';
     addMessage('user', text);
+    showTypingIndicator();
     
     messageInput.disabled = true;
     sendBtn.disabled = true;
@@ -343,6 +401,7 @@
         body: JSON.stringify({ from: phone, body: text })
       });
       const data = await res.json();
+      hideTypingIndicator();
 
       if (!res.ok || !data.success) throw new Error('API error');
 
@@ -371,6 +430,7 @@
       }
 
     } catch (err) {
+      hideTypingIndicator();
       console.error(err);
       addMessage('error', 'Error sending message: ' + err.message);
       messageInput.disabled = false;
