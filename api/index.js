@@ -1,26 +1,21 @@
-import { NestFactory } from '@nestjs/core';
-import { NestExpressApplication } from '@nestjs/platform-express';
-import { AppModule } from '../src/app.module';
-import { ExpressAdapter } from '@nestjs/platform-express';
-import { join } from 'path';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import express from 'express';
+const { NestFactory } = require('@nestjs/core');
+const { ExpressAdapter } = require('@nestjs/platform-express');
+const express = require('express');
+const { DocumentBuilder, SwaggerModule } = require('@nestjs/swagger');
+const path = require('path');
 
 const server = express();
-
-let cachedApp: any;
+let cachedServer;
 
 async function bootstrap() {
-  if (!cachedApp) {
-    const app = await NestFactory.create<NestExpressApplication>(
-      AppModule,
-      new ExpressAdapter(server),
-    );
+  if (!cachedServer) {
+    const { AppModule } = require('../dist/src/app.module');
+    const app = await NestFactory.create(AppModule, new ExpressAdapter(server));
 
     app.enableCors();
 
     try {
-      app.useStaticAssets(join(process.cwd(), 'public'));
+      app.useStaticAssets(path.join(process.cwd(), 'public'));
     } catch (e) {
       console.warn('Could not register static assets path:', e);
     }
@@ -34,16 +29,16 @@ async function bootstrap() {
     SwaggerModule.setup('api', app, document);
 
     await app.init();
-    cachedApp = server;
+    cachedServer = server;
   }
-  return cachedApp;
+  return cachedServer;
 }
 
-export default async function handler(req: any, res: any) {
+module.exports = async (req, res) => {
   try {
     const app = await bootstrap();
     return app(req, res);
-  } catch (error: any) {
+  } catch (error) {
     console.error('Serverless Function Invocation Error:', error);
     return res.status(500).json({
       statusCode: 500,
@@ -55,5 +50,4 @@ export default async function handler(req: any, res: any) {
       },
     });
   }
-}
-
+};
