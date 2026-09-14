@@ -657,10 +657,14 @@ export class ChatbotService {
   // Placeholder in-memory store for conversation state
   private conversationStore = new Map<string, ChatMessage[]>();
 
-  // OpenAI client
-  private openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
+  private getOpenAIClient(): OpenAI {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      this.logger.error('OPENAI_API_KEY environment variable is not defined!');
+      throw new Error('OPENAI_API_KEY is not defined in environment variables');
+    }
+    return new OpenAI({ apiKey });
+  }
 
   constructor(private readonly storeConfigService: StoreConfigService) {}
 
@@ -754,16 +758,21 @@ export class ChatbotService {
     this.conversationStore.set(from, history);
 
     // Call LLM
-    const aiResponse = await this.callLanguageModel(history);
+    try {
+      const aiResponse = await this.callLanguageModel(history);
 
-    // Append AI response
-    history.push({ role: 'assistant', content: aiResponse });
-    this.conversationStore.set(from, history);
+      // Append AI response
+      history.push({ role: 'assistant', content: aiResponse });
+      this.conversationStore.set(from, history);
 
-    // Send SMS
-    await this.sendSMS(from, aiResponse);
+      // Send SMS
+      await this.sendSMS(from, aiResponse);
 
-    return aiResponse;
+      return aiResponse;
+    } catch (err: any) {
+      this.logger.error(`Error in handleIncomingMessage: ${err.message}`, err.stack);
+      return 'Sorry, I am having trouble connecting right now. Please try again later.';
+    }
   }
 
   /**
@@ -772,23 +781,20 @@ export class ChatbotService {
   private async callLanguageModel(history: ChatMessage[]): Promise<string> {
     this.logger.debug(`Calling LLM with ${history.length} messages in history`);
 
-    try {
-      const response = await this.openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: history,
-        max_tokens: 500,
-        temperature: 0.5,
-        response_format: { type: 'json_object' },
-      });
+    const client = this.getOpenAIClient();
+    const response = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: history,
+      max_tokens: 500,
+      temperature: 0.5,
+      response_format: { type: 'json_object' },
+    });
 
-      return (
-        response.choices[0].message.content ||
-        'Sorry, I am having trouble connecting right now. Please try again later.'
-      );
-    } catch (error) {
-      this.logger.error('Error calling OpenAI API:', error);
-      return 'Sorry, I am having trouble connecting right now. Please try again later.';
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error('OpenAI returned an empty response content');
     }
+    return content;
   }
 
   /**
