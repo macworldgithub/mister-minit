@@ -17,16 +17,6 @@ import { UpdateStoreConfigDto } from './dto/update-store-config.dto';
 export class StoreConfigController {
   constructor(private readonly storeConfigService: StoreConfigService) {}
 
-  @Post('migrate')
-  @ApiOperation({
-    summary: 'Migrate existing store data from static config into MongoDB',
-    description:
-      'One-time migration — reads STORE_MAPPING and inserts records that do not exist yet.',
-  })
-  migrateData() {
-    return this.storeConfigService.migrateData();
-  }
-
   @Post()
   @ApiOperation({ summary: 'Create a new store config record' })
   @ApiBody({ type: CreateStoreConfigDto })
