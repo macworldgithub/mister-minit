@@ -8,12 +8,12 @@
   ],
   "routes": [
     {
-      "src": "/simulator.html",
-      "dest": "/simulator.html"
+      "src": "/simulator",
+      "dest": "/index.html"
     },
     {
-      "src": "/simulator",
-      "dest": "/simulator.html"
+      "src": "/simulator.html",
+      "dest": "/index.html"
     },
     {
       "src": "/(.*)",

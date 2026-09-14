@@ -1,166 +1,461 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <title>Mister Minit SMS Simulator</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 40px auto;
-            padding: 20px;
-            background: #f4f4f9;
-        }
-
-        #chat-box {
-            height: 400px;
-            border: 1px solid #ccc;
-            background: #fff;
-            padding: 15px;
-            overflow-y: scroll;
-            border-radius: 5px;
-            margin-bottom: 15px;
-        }
-
-        .message {
-            margin-bottom: 10px;
-            padding: 8px 12px;
-            border-radius: 8px;
-            max-width: 80%;
-        }
-
-        .user {
-            background: #dcf8c6;
-            margin-left: auto;
-            text-align: right;
-        }
-
-        .bot {
-            background: #e1effc;
-            margin-right: auto;
-        }
-
-        .input-area {
-            display: flex;
-            gap: 10px;
-        }
-
-        input {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-
-        button {
-            padding: 10px 20px;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mister Minit SMS Simulator</title>
+<style>
+  :root {
+    --bg-page: #f9fafb;
+    --bg-app: #ffffff;
+    --primary: #1a1a2e;
+    --ai-bubble: #f0f0f0;
+    --badge-booking: #22c55e;
+    --badge-optout: #ef4444;
+    --badge-closed: #6b7280;
+    --border: #e5e7eb;
+    --text-main: #1f2937;
+    --text-muted: #6b7280;
+  }
+  body {
+    background-color: var(--bg-page);
+    font-family: system-ui, -apple-system, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    color: var(--text-main);
+    height: 100vh;
+    overflow: hidden;
+  }
+  #app {
+    width: 100%;
+    max-width: 420px;
+    background: var(--bg-app);
+    height: 100vh;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+  }
+  header h1 {
+    font-size: 1.25rem;
+    margin: 0 0 4px 0;
+  }
+  header p {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin: 0;
+  }
+  .setup-panel {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .setup-panel label {
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+  input, select, button {
+    font-family: inherit;
+    font-size: 1rem;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-sizing: border-box;
+  }
+  button {
+    background: var(--primary);
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .chat-window {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: #fafafa;
+  }
+  .message {
+    display: flex;
+    flex-direction: column;
+    max-width: 80%;
+  }
+  .message.user {
+    align-self: flex-end;
+  }
+  .message.ai {
+    align-self: flex-start;
+  }
+  .message.error {
+    align-self: center;
+    max-width: 90%;
+  }
+  .bubble {
+    padding: 12px 16px;
+    border-radius: 16px;
+    font-size: 0.9375rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .message.user .bubble {
+    background: var(--primary);
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+  .message.ai .bubble {
+    background: var(--ai-bubble);
+    color: var(--text-main);
+    border-bottom-left-radius: 4px;
+  }
+  .message.error .bubble {
+    background: #fee2e2;
+    color: #991b1b;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 0.875rem;
+  }
+  .time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+  .message.user .time {
+    text-align: right;
+  }
+  .badges {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+  }
+  .badge {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    color: white;
+    font-weight: 500;
+  }
+  .badge.booking { background: var(--badge-booking); }
+  .badge.optout { background: var(--badge-optout); }
+  .badge.closed { background: var(--badge-closed); }
+  
+  .input-area {
+    padding: 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    background: white;
+  }
+  .input-area input {
+    flex: 1;
+  }
+  .status-message {
+    text-align: center;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    padding: 16px 8px 8px 8px;
+    display: none;
+    background: #fafafa;
+  }
+  .typing-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 12px 16px;
+  }
+  .typing-indicator span {
+    width: 7px;
+    height: 7px;
+    background-color: var(--text-muted);
+    border-radius: 50%;
+    display: inline-block;
+    animation: typingBounce 1.4s infinite ease-in-out both;
+  }
+  .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+  .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+  @keyframes typingBounce {
+    0%, 80%, 100% { transform: scale(0.4); opacity: 0.3; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+</style>
 </head>
-
 <body>
 
-    <h2>Mister Minit SMS Simulator (Missed-Call Flow)</h2>
+<div id="app">
+  <header>
+    <h1>Mister Minit SMS Simulator</h1>
+    <p>Internal testing only</p>
+  </header>
+
+  <div class="setup-panel" id="setupPanel">
+    <label for="storeSelect">Store</label>
+    <select id="storeSelect">
+      <option value="">Loading stores...</option>
+    </select>
+    <div id="didInfo" style="font-size: 0.8rem; color: var(--text-muted); margin-top: -6px;">DID: -</div>
+
+    <label for="phoneInput">Customer Phone</label>
+    <input type="text" id="phoneInput" value="0401000099">
+
+    <button id="startBtn">Start Conversation</button>
+  </div>
+
+  <div class="chat-window" id="chatWindow">
+    <!-- Messages go here -->
+  </div>
+
+  <div class="status-message" id="statusMessage">Conversation ended</div>
+
+  <div class="input-area" id="inputArea" style="display: none;">
+    <input type="text" id="messageInput" placeholder="Type a message..." autocomplete="off">
+    <button id="sendBtn">Send</button>
+  </div>
+
+  <div style="padding: 0 16px 16px 16px; text-align: center; display: none; background: white;" id="resetArea">
+    <button id="resetBtn" style="background: var(--text-muted); width: 100%;">New Conversation</button>
+  </div>
+</div>
+
+<script>
+  const storeSelect = document.getElementById('storeSelect');
+  const didInfo = document.getElementById('didInfo');
+  const phoneInput = document.getElementById('phoneInput');
+  const startBtn = document.getElementById('startBtn');
+  const chatWindow = document.getElementById('chatWindow');
+  const messageInput = document.getElementById('messageInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const setupPanel = document.getElementById('setupPanel');
+  const inputArea = document.getElementById('inputArea');
+  const resetArea = document.getElementById('resetArea');
+  const statusMessage = document.getElementById('statusMessage');
+
+  function updateDidDisplay() {
+    const selectedDid = storeSelect.value;
+    didInfo.textContent = selectedDid ? `Store DID: ${selectedDid}` : 'DID: -';
+  }
+
+  storeSelect.addEventListener('change', updateDidDisplay);
+
+  async function loadStores() {
+    try {
+      const res = await fetch('/store-config');
+      if (!res.ok) throw new Error('Failed to fetch stores');
+      const stores = await res.json();
+      
+      storeSelect.innerHTML = '';
+      stores.forEach(store => {
+        const option = document.createElement('option');
+        option.value = store.did;
+        option.textContent = store.did ? `${store.storeName} (${store.did})` : store.storeName;
+        storeSelect.appendChild(option);
+      });
+      updateDidDisplay();
+    } catch (err) {
+      console.error(err);
+      storeSelect.innerHTML = '<option value="">Error loading stores</option>';
+    }
+  }
+
+  function getTimeString() {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function scrollToBottom() {
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+  }
+
+  function addMessage(type, text, badges = null) {
+    if (!text && !badges) return;
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `message ${type}`;
     
-    <div style="margin-bottom: 15px; display: flex; gap: 10px;">
-        <select id="store-selector" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc; flex: 1;">
-            <option value="0872286100">Marion (0872286100)</option>
-            <option value="09821200012062">Enex Pert (09821200012062)</option>
-            <option value="61892260988">Enex Pert (61892260988)</option>
-            <option value="61370360442">Traralgon (61370360442)</option>
-            <option value="09821200012620">Traralgon (09821200012620)</option>
-            <option value="0370360236">Tok H (0370360236)</option>
-            <option value="0863652926">Dianella (0863652926)</option>
-            <option value="0861868180">The Mezz (0861868180)</option>
-            <option value="0738214854">Cleveland (0738214854)</option>
-        </select>
-        <button onclick="triggerMissedCallFlow()" style="background: #28a745;">Simulate Missed Call</button>
-    </div>
+    let badgesHtml = '';
+    if (badges) {
+      let b = [];
+      if (badges.bookingIntentDetected) b.push('<span class="badge booking">Booking Captured</span>');
+      if (badges.optOut) b.push('<span class="badge optout">Opted Out</span>');
+      if (badges.threadShouldClose) b.push('<span class="badge closed">Thread Closed</span>');
+      if (b.length > 0) {
+        badgesHtml = `<div class="badges">${b.join('')}</div>`;
+      }
+    }
 
-    <div id="chat-box"></div>
+    let textHtml = text ? `<div class="bubble">${text}</div>` : '';
+    let timeHtml = type !== 'error' ? `<div class="time">${getTimeString()}</div>` : '';
 
-    <div class="input-area">
-        <input type="text" id="message-input" placeholder="Type your reply as the customer..."
-            onkeypress="handleKey(event)">
-        <button onclick="sendCustomerReply()">Send Reply</button>
-    </div>
+    msgDiv.innerHTML = `
+      ${textHtml}
+      ${badgesHtml}
+      ${timeHtml}
+    `;
+    chatWindow.appendChild(msgDiv);
+    scrollToBottom();
+  }
 
-    <script>
-        const customerNumber = "+61400000999";
+  function disableChat() {
+    inputArea.style.display = 'none';
+    statusMessage.style.display = 'block';
+  }
 
-        // The moment the page opens, simulate the missed call firing our proactive first text
-        window.onload = function () {
-            triggerMissedCallFlow();
-        };
+  function enableChat() {
+    inputArea.style.display = 'flex';
+    statusMessage.style.display = 'none';
+  }
 
-        async function triggerMissedCallFlow() {
-            // Clear existing chat memory on UI
-            document.getElementById('chat-box').innerHTML = '';
-            
-            const storeDID = document.getElementById('store-selector').value;
+  startBtn.addEventListener('click', async () => {
+    const did = storeSelect.value;
+    const phone = phoneInput.value.trim();
+    if (!did || !phone) return alert('Please select a store and enter a phone number.');
 
-            try {
-                // Call the backend to initiate chat and get the dynamic greeting
-                const response = await fetch('http://localhost:3005/sms/initiate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ from: customerNumber, storeDID: storeDID })
-                });
-                
-                const data = await response.json();
-                const initialGreeting = data.greeting || "Hi, thanks for calling! Sorry we missed your call.";
-                
-                // Show it on screen as our message to the customer
-                appendMessage(initialGreeting, "bot");
-            } catch (error) {
-                appendMessage("Error initiating chat with backend.", "bot");
-            }
-        }
+    startBtn.disabled = true;
+    startBtn.textContent = 'Starting...';
 
-        async function sendCustomerReply() {
-            const input = document.getElementById('message-input');
-            const text = input.value.trim();
-            if (!text) return;
+    setupPanel.style.display = 'none';
+    resetArea.style.display = 'block';
+    enableChat();
+    showTypingIndicator();
 
-            // Show customer's reply on screen
-            appendMessage(text, "user");
-            input.value = "";
+    try {
+      const res = await fetch('/test/missed-call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fromNo: phone, dialNo: did })
+      });
+      const data = await res.json();
+      hideTypingIndicator();
 
-            // Send it to your NestJS webhook
-            try {
-                const response = await fetch('http://localhost:3005/sms/webhook', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ from: customerNumber, text: text })
-                });
+      if (!res.ok || !data.success) throw new Error('API error');
+      
+      if (data.result && data.result.openingSmsText) {
+        addMessage('ai', data.result.openingSmsText);
+      } else {
+        addMessage('error', 'No opening SMS text received. The call may have been suppressed or thread already exists.');
+      }
 
-                const data = await response.json();
-                // Show the AI's response back to the customer
-                appendMessage(data.reply || "AI processed your message.", "bot");
-            } catch (error) {
-                appendMessage("Error connecting to NestJS backend.", "bot");
-            }
-        }
+    } catch (err) {
+      hideTypingIndicator();
+      console.error(err);
+      addMessage('error', 'Error starting conversation: ' + err.message);
+      setupPanel.style.display = 'flex';
+      resetArea.style.display = 'none';
+      startBtn.disabled = false;
+      startBtn.textContent = 'Start Conversation';
+    }
+  });
 
-        function appendMessage(text, sender) {
-            const chatBox = document.getElementById('chat-box');
-            const div = document.createElement('div');
-            div.className = `message ${sender}`;
-            div.innerText = text;
-            chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
+  let typingIndicatorEl = null;
 
-        function handleKey(e) {
-            if (e.key === 'Enter') sendCustomerReply();
-        }
-    </script>
+  function showTypingIndicator() {
+    if (typingIndicatorEl) return;
+    typingIndicatorEl = document.createElement('div');
+    typingIndicatorEl.className = 'message ai';
+    typingIndicatorEl.innerHTML = `
+      <div class="bubble typing-indicator">
+        <span></span><span></span><span></span>
+      </div>
+    `;
+    chatWindow.appendChild(typingIndicatorEl);
+    scrollToBottom();
+  }
+
+  function hideTypingIndicator() {
+    if (typingIndicatorEl) {
+      typingIndicatorEl.remove();
+      typingIndicatorEl = null;
+    }
+  }
+
+  async function sendMessage() {
+    const text = messageInput.value.trim();
+    const phone = phoneInput.value.trim();
+    if (!text) return;
+
+    messageInput.value = '';
+    addMessage('user', text);
+    showTypingIndicator();
+    
+    messageInput.disabled = true;
+    sendBtn.disabled = true;
+
+    try {
+      const res = await fetch('/test/inbound-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: phone, body: text })
+      });
+      const data = await res.json();
+      hideTypingIndicator();
+
+      if (!res.ok || !data.success) throw new Error('API error');
+
+      const result = data.result;
+      
+      if (result.replyText) {
+        addMessage('ai', result.replyText, {
+          bookingIntentDetected: result.bookingIntentDetected,
+          optOut: result.optOut,
+          threadShouldClose: result.threadShouldClose
+        });
+      } else if (result.optOut || result.threadShouldClose || result.bookingIntentDetected) {
+         addMessage('ai', null, {
+          bookingIntentDetected: result.bookingIntentDetected,
+          optOut: result.optOut,
+          threadShouldClose: result.threadShouldClose
+        });
+      }
+
+      if (result.optOut || result.threadShouldClose) {
+        disableChat();
+      } else {
+        messageInput.disabled = false;
+        sendBtn.disabled = false;
+        messageInput.focus();
+      }
+
+    } catch (err) {
+      hideTypingIndicator();
+      console.error(err);
+      addMessage('error', 'Error sending message: ' + err.message);
+      messageInput.disabled = false;
+      sendBtn.disabled = false;
+    }
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  messageInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
+  });
+
+  resetBtn.addEventListener('click', () => {
+    chatWindow.innerHTML = '';
+    setupPanel.style.display = 'flex';
+    inputArea.style.display = 'none';
+    resetArea.style.display = 'none';
+    statusMessage.style.display = 'none';
+    startBtn.disabled = false;
+    startBtn.textContent = 'Start Conversation';
+    messageInput.disabled = false;
+    sendBtn.disabled = false;
+  });
+
+  loadStores();
+</script>
 </body>
-
 </html>
