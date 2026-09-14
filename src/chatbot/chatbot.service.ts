@@ -871,6 +871,7 @@ export class ChatbotService {
         bookingDetails: null,
         threadShouldClose: false,
         closeReason: null,
+        llmError: err.message || 'LLM call failed',
       };
     }
 
@@ -922,6 +923,7 @@ export class ChatbotService {
         bookingDetails: null,
         threadShouldClose: false,
         closeReason: null,
+        llmError: `JSON parse error: ${e.message}`,
       };
     }
   }
@@ -941,4 +943,5 @@ export interface ChatbotResponse {
     preferredTime: string;
     serviceType: string;
   } | null;
+  llmError?: string;
 }
