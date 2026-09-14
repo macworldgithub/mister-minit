@@ -9,7 +9,19 @@ let cachedServer;
 
 async function bootstrap() {
   if (!cachedServer) {
-    const { AppModule } = require('../dist/src/app.module');
+    let AppModule;
+    try {
+      AppModule = require('../dist/app.module').AppModule;
+    } catch (e) {
+      if (
+        e.code === 'MODULE_NOT_FOUND' &&
+        (e.message.includes('../dist/app.module') || e.message.includes("Cannot find module '../dist/app.module'"))
+      ) {
+        AppModule = require('../dist/src/app.module').AppModule;
+      } else {
+        throw e;
+      }
+    }
     const app = await NestFactory.create(AppModule, new ExpressAdapter(server));
 
     app.enableCors();
