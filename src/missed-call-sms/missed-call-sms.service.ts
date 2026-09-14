@@ -704,15 +704,19 @@ export class MissedCallSmsService {
       store.actionNotes?.toLowerCase().includes('no mobile van');
 
     const contactLabel = isHqReception ? 'HQ Reception No' : 'Mobile Van No';
-    const bookingLink =
-      store.bookingLink || 'https://misterminit.co/pages/car-keys';
 
     const lines = [
       `Hi, sorry we missed your call to Mister Minit ${store.storeName}.`,
       `Our hours: ${store.tradingHours}.`,
-      `Booking Link: ${bookingLink}`,
-      `Find us here: ${store.googleMapsLink || ''}`,
     ];
+
+    if (store.bookingLink) {
+      lines.push(`Booking Link: ${store.bookingLink}`);
+    }
+
+    if (store.googleMapsLink) {
+      lines.push(`Find us here: ${store.googleMapsLink}`);
+    }
 
     if (store.contactPhoneNumber) {
       lines.push(`${contactLabel}: ${store.contactPhoneNumber}`);

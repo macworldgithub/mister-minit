@@ -688,7 +688,7 @@ export class ChatbotService {
         .replace(/\{\{ACTION_NOTES\}\}/g, store.actionNotes ?? '')
         .replace(
           /\{\{BOOKING_LINK\}\}/g,
-          store.bookingLink ?? 'https://misterminit.co/pages/car-keys',
+          store.bookingLink ?? '',
         );
     } else {
       dynamicSystemPrompt = dynamicSystemPrompt.replace(
@@ -736,7 +736,7 @@ export class ChatbotService {
           .replace(/\{\{ACTION_NOTES\}\}/g, store.actionNotes ?? '')
           .replace(
             /\{\{BOOKING_LINK\}\}/g,
-            store.bookingLink ?? 'https://misterminit.co/pages/car-keys',
+            store.bookingLink ?? '',
           );
       }
 
@@ -831,7 +831,7 @@ export class ChatbotService {
         .replace(/\{\{ACTION_NOTES\}\}/g, storeRecord.actionNotes ?? '')
         .replace(
           /\{\{BOOKING_LINK\}\}/g,
-          storeRecord.bookingLink ?? 'https://misterminit.co/pages/car-keys',
+          storeRecord.bookingLink ?? '',
         );
     }
 

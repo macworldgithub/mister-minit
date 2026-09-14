@@ -39,7 +39,7 @@ export class StoreConfig {
   @Prop({ default: '' })
   actionNotes: string;
 
-  @Prop({ default: 'https://misterminit.co/pages/car-keys' })
+  @Prop({ default: '' })
   bookingLink: string;
 
   @Prop({ type: [StaffContactSchema], default: [] })
