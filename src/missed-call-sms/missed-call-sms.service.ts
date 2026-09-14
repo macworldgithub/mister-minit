@@ -451,7 +451,7 @@ export class MissedCallSmsService {
         `Preferred time: ${bd.preferredTime}`;
 
       if (staffEmails.length > 0) {
-        this.mailService.sendEmail(staffEmails, emailSubject, emailBody);
+        await this.mailService.sendEmail(staffEmails, emailSubject, emailBody);
       }
 
       if (store?.staffContacts?.length) {
