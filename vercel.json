@@ -2,6 +2,10 @@
   "version": 2,
   "builds": [
     {
+      "src": "public/**",
+      "use": "@vercel/static"
+    },
+    {
       "src": "api/index.js",
       "use": "@vercel/node",
       "config": {
@@ -12,15 +16,18 @@
   "routes": [
     {
       "src": "/simulator",
-      "dest": "/index.html"
+      "dest": "/public/index.html"
     },
     {
       "src": "/simulator.html",
-      "dest": "/index.html"
+      "dest": "/public/index.html"
     },
     {
       "src": "/index.html",
-      "dest": "/index.html"
+      "dest": "/public/index.html"
+    },
+    {
+      "handle": "filesystem"
     },
     {
       "src": "/(.*)",
