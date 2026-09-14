@@ -18,7 +18,12 @@ async function bootstrap() {
     );
 
     app.enableCors();
-    app.useStaticAssets(join(process.cwd(), 'public'));
+
+    try {
+      app.useStaticAssets(join(process.cwd(), 'public'));
+    } catch (e) {
+      console.warn('Could not register static assets path:', e);
+    }
 
     const config = new DocumentBuilder()
       .setTitle('Mister Minit API')
@@ -29,12 +34,26 @@ async function bootstrap() {
     SwaggerModule.setup('api', app, document);
 
     await app.init();
-    cachedApp = app;
+    cachedApp = server;
   }
-  return server;
+  return cachedApp;
 }
 
 export default async function handler(req: any, res: any) {
-  const app = await bootstrap();
-  app(req, res);
+  try {
+    const app = await bootstrap();
+    return app(req, res);
+  } catch (error: any) {
+    console.error('Serverless Function Invocation Error:', error);
+    return res.status(500).json({
+      statusCode: 500,
+      error: 'Internal Server Error',
+      message: error?.message || 'Serverless function failed to initialize.',
+      envCheck: {
+        hasMongoUri: !!process.env.MONGO_URI,
+        hasOpenAiKey: !!process.env.OPENAI_API_KEY,
+      },
+    });
+  }
 }
+
