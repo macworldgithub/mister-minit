@@ -33,6 +33,15 @@ export class StoreConfig {
   @Prop({ default: '' })
   googleMapsLink: string;
 
+  @Prop({ default: '' })
+  contactPhoneNumber: string;
+
+  @Prop({ default: '' })
+  actionNotes: string;
+
+  @Prop({ default: 'https://misterminit.co/pages/car-keys' })
+  bookingLink: string;
+
   @Prop({ type: [StaffContactSchema], default: [] })
   staffContacts: StaffContact[];
 

@@ -680,7 +680,16 @@ export class ChatbotService {
         .replace(/\{\{STORE_ADDRESS\}\}/g, store.address)
         .replace(/\{\{STORE_TRADING_HOURS\}\}/g, store.tradingHours)
         .replace(/\{\{STORE_STAFF_CONTACT\}\}/g, staffContactStr)
-        .replace(/\{\{STORE_DID\}\}/g, store.did);
+        .replace(/\{\{STORE_DID\}\}/g, store.did)
+        .replace(
+          /\{\{CONTACT_PHONE_NUMBER\}\}/g,
+          store.contactPhoneNumber ?? '',
+        )
+        .replace(/\{\{ACTION_NOTES\}\}/g, store.actionNotes ?? '')
+        .replace(
+          /\{\{BOOKING_LINK\}\}/g,
+          store.bookingLink ?? 'https://misterminit.co/pages/car-keys',
+        );
     } else {
       dynamicSystemPrompt = dynamicSystemPrompt.replace(
         /\{\{STORE_NAME\}\}/g,
@@ -719,7 +728,16 @@ export class ChatbotService {
           .replace(/\{\{STORE_ADDRESS\}\}/g, store.address)
           .replace(/\{\{STORE_TRADING_HOURS\}\}/g, store.tradingHours)
           .replace(/\{\{STORE_STAFF_CONTACT\}\}/g, staffContactStr)
-          .replace(/\{\{STORE_DID\}\}/g, store.did);
+          .replace(/\{\{STORE_DID\}\}/g, store.did)
+          .replace(
+            /\{\{CONTACT_PHONE_NUMBER\}\}/g,
+            store.contactPhoneNumber ?? '',
+          )
+          .replace(/\{\{ACTION_NOTES\}\}/g, store.actionNotes ?? '')
+          .replace(
+            /\{\{BOOKING_LINK\}\}/g,
+            store.bookingLink ?? 'https://misterminit.co/pages/car-keys',
+          );
       }
 
       const systemMessage: ChatMessage = {
@@ -805,7 +823,16 @@ export class ChatbotService {
         .replace(/\{\{STORE_ADDRESS\}\}/g, storeRecord.address ?? '')
         .replace(/\{\{STORE_TRADING_HOURS\}\}/g, storeRecord.tradingHours ?? '')
         .replace(/\{\{GOOGLE_MAPS_LINK\}\}/g, storeRecord.googleMapsLink ?? '')
-        .replace(/\{\{STORE_DID\}\}/g, storeRecord.did ?? '');
+        .replace(/\{\{STORE_DID\}\}/g, storeRecord.did ?? '')
+        .replace(
+          /\{\{CONTACT_PHONE_NUMBER\}\}/g,
+          storeRecord.contactPhoneNumber ?? '',
+        )
+        .replace(/\{\{ACTION_NOTES\}\}/g, storeRecord.actionNotes ?? '')
+        .replace(
+          /\{\{BOOKING_LINK\}\}/g,
+          storeRecord.bookingLink ?? 'https://misterminit.co/pages/car-keys',
+        );
     }
 
     // Reconstruct history in OpenAI format

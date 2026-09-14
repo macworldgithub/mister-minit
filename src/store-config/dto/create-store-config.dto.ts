@@ -78,6 +78,30 @@ export class CreateStoreConfigDto {
   googleMapsLink?: string;
 
   @ApiPropertyOptional({
+    example: '0423 707 295',
+    description: 'Contact phone number (mobile van or HQ reception)',
+  })
+  @IsOptional()
+  @IsString()
+  contactPhoneNumber?: string;
+
+  @ApiPropertyOptional({
+    example: 'Direct to Mobile Van',
+    description: 'Action or notes regarding contact phone routing',
+  })
+  @IsOptional()
+  @IsString()
+  actionNotes?: string;
+
+  @ApiPropertyOptional({
+    example: 'https://misterminit.co/pages/car-keys',
+    description: 'Online booking URL for car keys / services',
+  })
+  @IsOptional()
+  @IsString()
+  bookingLink?: string;
+
+  @ApiPropertyOptional({
     type: [StaffContactDto],
     description: 'List of staff contacts for this store',
   })
