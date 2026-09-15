@@ -698,36 +698,13 @@ export class MissedCallSmsService {
 
   // ── SMS templates ──────────────────────────────────────────────────────────
 
-  private buildOpeningSms(store: StoreConfig): string {
-    const isHqReception =
-      store.actionNotes?.toLowerCase().includes('hq reception') ||
-      store.actionNotes?.toLowerCase().includes('no mobile van');
-
-    const contactLabel = isHqReception ? 'HQ Reception No' : 'Mobile Van No';
-
-    const lines = [
-      `Hi, sorry we missed your call to Mister Minit ${store.storeName}.`,
-      `Our hours: ${store.tradingHours}.`,
-    ];
-
-    if (store.bookingLink) {
-      lines.push(`Booking Link: ${store.bookingLink}`);
-    }
-
-    if (store.googleMapsLink) {
-      lines.push(`Find us here: ${store.googleMapsLink}`);
-    }
-
-    if (store.contactPhoneNumber) {
-      lines.push(`${contactLabel}: ${store.contactPhoneNumber}`);
-    }
-
-    lines.push(
-      `Is there something we can help with: keys, shoe repairs, engraving, watches or sharpening?`,
-    );
-    lines.push(`Reply STOP to opt out of these messages.`);
-
-    return lines.join('\n');
+  public buildOpeningSms(store: StoreConfig): string {
+    return [
+      `Hi, sorry we missed your call to Mister Minit ${store.storeName}! How can we help you today?`,
+      ``,
+      `Website: https://misterminit.co`,
+      `Reply STOP to opt out.`,
+    ].join('\n');
   }
 
   private buildFollowUpSms(store: StoreConfig | null): string {

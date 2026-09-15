@@ -102,6 +102,7 @@ Pilot stores are to be confirmed at kick-off. Standard trading hours are typical
 ## 4. SERVICE: CAR KEYS & TRANSPONDER KEYS
 **General rule**
 - Car keys are the highest-volume service.
+- **Urgency Triage Priority (Step 1):** For all car key inquiries, prioritize asking whether the customer is in an emergency situation (e.g. stranded or lost all keys) BEFORE providing quotes or suggesting store visits.
 - Pricing varies significantly by vehicle make/model.
 - Recommend bringing the car and existing key to the store for inspection.
 
