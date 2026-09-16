@@ -22,6 +22,14 @@ You are representing:
 Always use this store's name, location, and hours naturally in conversation. Never give generic or placeholder answers.
 Always refer back to the store the customer originally called.Never suggest a different store location.
 
+### LOCATION & ADDRESS INQUIRIES — MANDATORY RULE
+
+Whenever a customer asks about the store's location, address, where the store is located, or directions (e.g. "where are you located", "what is your address", "where is your shop", "can you send location link", "how do I find you"):
+- You MUST ALWAYS provide BOTH the full address ({{STORE_ADDRESS}}) AND the Google Maps link ({{GOOGLE_MAPS_LINK}}) together in the SAME message.
+- NEVER send only the address without the Google Maps link, and never make the customer ask separately for the map link.
+- Example: "We're at {{STORE_ADDRESS}}. Here's our location on Google Maps: {{GOOGLE_MAPS_LINK}}. Hope to see you soon!"
+
+
 ### PRIMARY GOAL
 
 Convert this missed call into an in-store visit by:
@@ -517,6 +525,10 @@ Toyota, Hyundai, Ford, Mazda, Subaru, Honda, Nissan, Volkswagen, Commodore / Hol
 **"Can you give me a quote over the phone?"**
 > "Happy to give you a rough idea! [INDICATIVE PRICE]. The final price is confirmed in-store once we can see your item, as it can vary by make, model or size."
 
+**"Where are you located?" / "What is your address?" / Location inquiries**
+> Whenever a customer asks where the store is located, for the address, or for directions: ALWAYS send BOTH the full address ({{STORE_ADDRESS}}) AND the Google Maps link ({{GOOGLE_MAPS_LINK}}) together in the same message.
+> Example: "We're at {{STORE_ADDRESS}}. Here's our location on Google Maps: {{GOOGLE_MAPS_LINK}}. Hope to see you soon!"
+
 **"Are you open now?"**
 > Use the current store's confirmed trading hours if available: "We're open [TRADING HOURS] today. Come in and we'll get you sorted!"
 
@@ -608,6 +620,9 @@ Conversation summary: [BRIEF SUMMARY]
 - Engraving is frequently completed same-day in 10–30 minutes.
 
 ### 16. RESPONSE DECISION LOGIC
+**If customer asks where the store is located / asks for address / location / directions**
+- Always provide BOTH the store address ({{STORE_ADDRESS}}) AND the Google Maps link ({{GOOGLE_MAPS_LINK}}) together in the same response message.
+
 **If customer asks for a price**
 - Identify the service.
 - Give the relevant indicative "from/around" price.
@@ -688,6 +703,7 @@ export class ChatbotService {
         .replace(/\{\{STORE_NAME\}\}/g, store.storeName)
         .replace(/\{\{STORE_ADDRESS\}\}/g, store.address)
         .replace(/\{\{STORE_TRADING_HOURS\}\}/g, store.tradingHours)
+        .replace(/\{\{GOOGLE_MAPS_LINK\}\}/g, store.googleMapsLink ?? '')
         .replace(/\{\{STORE_STAFF_CONTACT\}\}/g, staffContactStr)
         .replace(/\{\{STORE_DID\}\}/g, store.did)
         .replace(
@@ -700,10 +716,16 @@ export class ChatbotService {
           store.bookingLink ?? '',
         );
     } else {
-      dynamicSystemPrompt = dynamicSystemPrompt.replace(
-        /\{\{STORE_NAME\}\}/g,
-        storeName,
-      );
+      dynamicSystemPrompt = dynamicSystemPrompt
+        .replace(/\{\{STORE_NAME\}\}/g, storeName)
+        .replace(/\{\{STORE_ADDRESS\}\}/g, '')
+        .replace(/\{\{STORE_TRADING_HOURS\}\}/g, '')
+        .replace(/\{\{GOOGLE_MAPS_LINK\}\}/g, '')
+        .replace(/\{\{STORE_STAFF_CONTACT\}\}/g, '')
+        .replace(/\{\{STORE_DID\}\}/g, '')
+        .replace(/\{\{CONTACT_PHONE_NUMBER\}\}/g, '')
+        .replace(/\{\{ACTION_NOTES\}\}/g, '')
+        .replace(/\{\{BOOKING_LINK\}\}/g, '');
     }
     const systemMessage: ChatMessage = {
       role: 'system',
@@ -733,11 +755,12 @@ export class ChatbotService {
       if (store) {
         const staffContactStr = store.staffContacts?.[0]?.mobile || '';
         dynamicSystemPrompt = dynamicSystemPrompt
-          .replace(/\{\{STORE_NAME\}\}/g, store.storeName)
-          .replace(/\{\{STORE_ADDRESS\}\}/g, store.address)
-          .replace(/\{\{STORE_TRADING_HOURS\}\}/g, store.tradingHours)
+          .replace(/\{\{STORE_NAME\}\}/g, store.storeName ?? '')
+          .replace(/\{\{STORE_ADDRESS\}\}/g, store.address ?? '')
+          .replace(/\{\{STORE_TRADING_HOURS\}\}/g, store.tradingHours ?? '')
+          .replace(/\{\{GOOGLE_MAPS_LINK\}\}/g, store.googleMapsLink ?? '')
           .replace(/\{\{STORE_STAFF_CONTACT\}\}/g, staffContactStr)
-          .replace(/\{\{STORE_DID\}\}/g, store.did)
+          .replace(/\{\{STORE_DID\}\}/g, store.did ?? '')
           .replace(
             /\{\{CONTACT_PHONE_NUMBER\}\}/g,
             store.contactPhoneNumber ?? '',
@@ -747,6 +770,17 @@ export class ChatbotService {
             /\{\{BOOKING_LINK\}\}/g,
             store.bookingLink ?? '',
           );
+      } else {
+        dynamicSystemPrompt = dynamicSystemPrompt
+          .replace(/\{\{STORE_NAME\}\}/g, 'Store')
+          .replace(/\{\{STORE_ADDRESS\}\}/g, '')
+          .replace(/\{\{STORE_TRADING_HOURS\}\}/g, '')
+          .replace(/\{\{GOOGLE_MAPS_LINK\}\}/g, '')
+          .replace(/\{\{STORE_STAFF_CONTACT\}\}/g, '')
+          .replace(/\{\{STORE_DID\}\}/g, '')
+          .replace(/\{\{CONTACT_PHONE_NUMBER\}\}/g, '')
+          .replace(/\{\{ACTION_NOTES\}\}/g, '')
+          .replace(/\{\{BOOKING_LINK\}\}/g, '');
       }
 
       const systemMessage: ChatMessage = {
@@ -844,6 +878,16 @@ export class ChatbotService {
           /\{\{BOOKING_LINK\}\}/g,
           storeRecord.bookingLink ?? '',
         );
+    } else {
+      dynamicSystemPrompt = dynamicSystemPrompt
+        .replace(/\{\{STORE_NAME\}\}/g, 'Store')
+        .replace(/\{\{STORE_ADDRESS\}\}/g, '')
+        .replace(/\{\{STORE_TRADING_HOURS\}\}/g, '')
+        .replace(/\{\{GOOGLE_MAPS_LINK\}\}/g, '')
+        .replace(/\{\{STORE_DID\}\}/g, '')
+        .replace(/\{\{CONTACT_PHONE_NUMBER\}\}/g, '')
+        .replace(/\{\{ACTION_NOTES\}\}/g, '')
+        .replace(/\{\{BOOKING_LINK\}\}/g, '');
     }
 
     // Reconstruct history in OpenAI format
