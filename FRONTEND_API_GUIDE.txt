@@ -1,0 +1,237 @@
+==============================================================================
+   MISTER MINIT - FRONTEND (FE) DASHBOARD & STATS INTEGRATION GUIDE
+==============================================================================
+
+Welcome! This guide explains how to connect your Frontend dashboard to the 
+Mister Minit backend analytics APIs.
+
+All endpoints support CORS, accept JSON, and are live on your backend.
+
+------------------------------------------------------------------------------
+1. BASE URL
+------------------------------------------------------------------------------
+Production: https://www.mister-minit.omnisuiteai.com
+Local Dev:  http://localhost:3060
+
+Swagger Interactive Docs: https://www.mister-minit.omnisuiteai.com/api
+
+==============================================================================
+2. QUICK SUMMARY OF APIS FOR YOUR SCREENS
+==============================================================================
+
+Screen Element                     | API Endpoint to Call
+-----------------------------------|------------------------------------------
+1. Store Filter Dropdown           | GET /stats/stores
+2. Top KPI Cards & Summary Charts  | GET /stats (or GET /stats?storeId=...)
+3. Store Comparison Table          | GET /stats/by-store
+4. Live System Logs & Audit Feed   | GET /logs/recent
+
+==============================================================================
+3. DETAILED API REFERENCE & INTEGRATION
+==============================================================================
+
+------------------------------------------------------------------------------
+API 1: Get Stores List (For Dropdown / Filter Selector)
+------------------------------------------------------------------------------
+Endpoint: GET /stats/stores
+Description: Call this once when the dashboard loads to populate your 
+"Select Store" dropdown menu.
+
+Example Response:
+[
+  {
+    "storeId": "6a9ea2774d7dcfbae9cc58b6",
+    "storeName": "Marion",
+    "did": "0872286100",
+    "isActive": true
+  },
+  {
+    "storeId": "6a9ea2774d7dcfbae9cc58b7",
+    "storeName": "Westfield Doncaster",
+    "did": "0398485555",
+    "isActive": true
+  }
+]
+
+FE Implementation Tip:
+Add an "All Stores" option at the top of your dropdown with value = "".
+
+------------------------------------------------------------------------------
+API 2: Main Stats & Analytics
+------------------------------------------------------------------------------
+Endpoint: GET /stats
+Query Parameters (Optional):
+  - storeId    : (string) MongoDB ID of store (e.g. ?storeId=6a9ea2774d7dcfbae9cc58b6)
+  - did        : (string) Phone number of store (e.g. ?did=0872286100)
+  - startDate  : (ISO date) e.g. ?startDate=2026-01-01
+  - endDate    : (ISO date) e.g. ?endDate=2026-12-31
+
+* If you do NOT pass storeId/did, it returns stats for ALL STORES combined.
+* If user selects a store in your dropdown, pass ?storeId=... to get that store only.
+
+Example Response:
+{
+  "scope": {
+    "isSingleStore": true,
+    "storeId": "6a9ea2774d7dcfbae9cc58b6",
+    "storeName": "Marion",
+    "did": "0872286100"
+  },
+  "telephony": {
+    "totalInboundCallVolume": 120,
+    "missedCalls": 42,
+    "answeredCalls": 78,
+    "storeMissedCallRate": 35.0
+  },
+  "conversions": {
+    "recoveredInquiries": 42,
+    "customerReplies": 28,
+    "customerEngagementRate": 66.7,
+    "bookingsCaptured": 12,
+    "bookingConversionRate": 28.6,
+    "footTrafficConversions": 8,
+    "serviceDemandBreakdown": {
+      "Car Keys": 6,
+      "Shoe Repair": 3,
+      "Watch Battery": 2,
+      "Key Cutting": 1
+    },
+    "threadStatusDistribution": {
+      "active": 10,
+      "closed_visited": 8,
+      "closed_no_response": 12,
+      "sms_sent": 12
+    }
+  },
+  "aiSafetyQualityControl": {
+    "deduplicationPrevented": 5,
+    "answeredCallsFiltered": 78,
+    "landlineFiltering": 6,
+    "internalCallsFiltered": 2,
+    "optedOutFiltered": 1,
+    "notPilotStoreFiltered": 0,
+    "totalCallsFiltered": 92
+  },
+  "complianceAndRetention": {
+    "totalOptOuts": 1,
+    "optOutRate": 2.4,
+    "sourceBreakdown": {
+      "keyword": 1,
+      "llm_detected": 0
+    }
+  }
+}
+
+------------------------------------------------------------------------------
+Where to display each field in your UI:
+------------------------------------------------------------------------------
+
+A. TOP KPI STAT CARDS:
+   - Total Inbound Calls:  telephony.totalInboundCallVolume
+   - Missed Calls:         telephony.missedCalls  (with telephony.storeMissedCallRate %)
+   - Recovered Inquiries:  conversions.recoveredInquiries (Total SMS threads opened)
+   - Customer Replies:     conversions.customerReplies (with conversions.customerEngagementRate %)
+   - Bookings Captured:    conversions.bookingsCaptured (with conversions.bookingConversionRate %)
+   - Store Visits:         conversions.footTrafficConversions (Customers confirmed visiting store)
+
+B. CHARTS:
+   - Service Demand (Bar/Pie Chart):
+     Use conversions.serviceDemandBreakdown (e.g. Car Keys, Shoe Repair, etc.)
+   - Conversation Funnel (Funnel Chart):
+     Missed Calls -> Recovered Inquiries -> Customer Replies -> Bookings Captured
+   - Conversation Status (Donut Chart):
+     Use conversions.threadStatusDistribution
+
+C. SAFETY & COMPLIANCE WIDGET:
+   - Deduplication Filtered: aiSafetyQualityControl.deduplicationPrevented (No double-messaging)
+   - Landlines Filtered:     aiSafetyQualityControl.landlineFiltering (Saved carrier SMS cost)
+   - Answered Calls Safe:    aiSafetyQualityControl.answeredCallsFiltered (Customer answered)
+   - Opt-Out Rate:           complianceAndRetention.optOutRate % (Legally compliant)
+
+------------------------------------------------------------------------------
+API 3: Store-by-Store Comparison Table
+------------------------------------------------------------------------------
+Endpoint: GET /stats/by-store
+Description: Returns an array of every store side-by-side. 
+Perfect for a Store Performance Table.
+
+Example Response:
+[
+  {
+    "storeId": "6a9ea2774d7dcfbae9cc58b6",
+    "storeName": "Marion",
+    "did": "0872286100",
+    "isActive": true,
+    "telephony": {
+      "totalInboundCallVolume": 120,
+      "missedCalls": 42,
+      "storeMissedCallRate": 35.0
+    },
+    "conversions": {
+      "recoveredInquiries": 42,
+      "customerReplies": 28,
+      "customerEngagementRate": 66.7,
+      "bookingsCaptured": 12,
+      "bookingConversionRate": 28.6,
+      "footTrafficConversions": 8
+    }
+  },
+  {
+    "storeId": "6a9ea2774d7dcfbae9cc58b7",
+    "storeName": "Westfield Doncaster",
+    "did": "0398485555",
+    "isActive": true,
+    "telephony": {
+      "totalInboundCallVolume": 95,
+      "missedCalls": 31,
+      "storeMissedCallRate": 32.6
+    },
+    "conversions": {
+      "recoveredInquiries": 31,
+      "customerReplies": 20,
+      "customerEngagementRate": 64.5,
+      "bookingsCaptured": 9,
+      "bookingConversionRate": 29.0,
+      "footTrafficConversions": 5
+    }
+  }
+]
+
+Columns to render in your comparison table:
+| Store Name | Total Calls | Missed Calls | Missed Rate | Replies | Engagement % | Bookings |
+|------------|-------------|--------------|-------------|---------|--------------|----------|
+| Marion     | 120         | 42           | 35.0%       | 28      | 66.7%        | 12       |
+
+==============================================================================
+4. REAL-TIME EVENT STREAM / LOGS (OPTIONAL LIVE TICKER)
+==============================================================================
+Endpoint: GET /logs/recent
+Description: Returns the 25 most recent activity events across the system.
+Use this if you want a "Live Activity Feed" showing when a call is missed, 
+when an SMS is sent, or when a booking is captured.
+
+Example Response:
+{
+  "total": 25,
+  "logs": [
+    {
+      "eventType": "BOOKING_CAPTURED",
+      "callerNumber": "+61460418736",
+      "storeName": "Marion",
+      "createdAt": "2026-09-21T08:58:10.000Z"
+    },
+    {
+      "eventType": "OPENING_SMS_SENT",
+      "callerNumber": "+61460418736",
+      "storeName": "Marion",
+      "createdAt": "2026-09-21T08:55:34.000Z"
+    }
+  ]
+}
+
+==============================================================================
+5. NEED HELP OR MORE FIELDS?
+==============================================================================
+Visit the interactive Swagger documentation anytime at:
+https://www.mister-minit.omnisuiteai.com/api
+==============================================================================

@@ -14,6 +14,7 @@ import { SuppressedEventsModule } from './suppressed-events/suppressed-events.mo
 import { SmsThreadsModule } from './sms-threads/sms-threads.module';
 import { MissedCallSmsModule } from './missed-call-sms/missed-call-sms.module';
 import { MailModule } from './mail/mail.module';
+import { StatsModule } from './stats/stats.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { MailModule } from './mail/mail.module';
     ChatbotModule,
     StoreConfigModule,
     MailModule,
+    StatsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
