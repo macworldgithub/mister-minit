@@ -81,6 +81,42 @@ export class MissedCallSmsController {
     };
   }
 
+  // ── POST /test/emit-cdr ───────────────────────────────────────────────────
+  @Post('emit-cdr')
+  async emitCdrEvent(
+    @Body()
+    body: {
+      fromNo: string;
+      dialNo: string;
+      duration?: string;
+      reasonTerminated?: string;
+    },
+  ) {
+    const callId = `emit-call-${Date.now()}`;
+    const cdrPayload = {
+      callid: callId,
+      timestamp: new Date().toISOString(),
+      duration: body.duration || '00:00:05',
+      'time-start': new Date().toISOString(),
+      'time-answered': '',
+      'time-end': new Date().toISOString(),
+      'reason-terminated':
+        body.reasonTerminated || 'src_participant_terminated',
+      'from-no': body.fromNo,
+      'from-dn': 'test-ext',
+      'dial-no': body.dialNo,
+    };
+
+    this.eventEmitter.emit('cdr.test', cdrPayload);
+
+    return {
+      success: true,
+      message: 'Manually emitted CDR test event via EventEmitter (cdr.test)',
+      callId,
+      payload: cdrPayload,
+    };
+  }
+
   // ── POST /test/inbound-sms ────────────────────────────────────────────────
   @Post('inbound-sms')
   async triggerInboundSms(@Body() body: { from: string; body: string }) {

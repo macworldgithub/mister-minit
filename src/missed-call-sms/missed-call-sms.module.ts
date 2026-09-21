@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MissedCallSmsService } from './missed-call-sms.service';
 import { SmsProviderService } from './sms-provider.service';
 import { MissedCallSmsController } from './missed-call-sms.controller';
+import { MobileMessageWebhookController } from './mobilemessage-webhook.controller';
 import { SmsThreadsModule } from '../sms-threads/sms-threads.module';
 import { OptOutModule } from '../opt-out/opt-out.module';
 import { SuppressedEventsModule } from '../suppressed-events/suppressed-events.module';
@@ -16,7 +17,7 @@ import { ChatbotModule } from '../chatbot/chatbot.module';
     StoreConfigModule,
     ChatbotModule,
   ],
-  controllers: [MissedCallSmsController],
+  controllers: [MissedCallSmsController, MobileMessageWebhookController],
   providers: [MissedCallSmsService, SmsProviderService],
   exports: [MissedCallSmsService, SmsProviderService],
 })

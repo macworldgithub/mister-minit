@@ -858,7 +858,7 @@ export class ChatbotService {
     messageCount: number;
     missedCallId: any;
   }): Promise<ChatbotResponse> {
-    const { storeRecord, conversationHistory, newInboundMessage } = params;
+    const { callerNumber, storeRecord, conversationHistory, newInboundMessage } = params;
 
     // Build dynamic system prompt from store record
     let dynamicSystemPrompt = SYSTEM_PROMPT;
@@ -907,10 +907,13 @@ export class ChatbotService {
 
     let rawReply: string;
     try {
+      this.logger.log(
+        `[OpenAI GPT] Prompting assistant with incoming message from ${callerNumber}: "${newInboundMessage}" (${history.length} messages in context)`,
+      );
       rawReply = await this.callLanguageModel(history);
-      this.logger.debug(`Raw LLM response: ${rawReply}`);
+      this.logger.log(`[OpenAI GPT] Response received for ${callerNumber}: ${rawReply}`);
     } catch (err: any) {
-      this.logger.error(`LLM call failed: ${err.message}`, err.stack);
+      this.logger.error(`[OpenAI GPT] Call failed for ${callerNumber}: ${err.message}`, err.stack);
       const did = storeRecord?.did ?? '';
       return {
         replyText: `Sorry, something went wrong. Please call us directly on ${did}.`,

@@ -80,6 +80,28 @@ export class MissedCallSmsService {
   // ══════════════════════════════════════════════════════════════════════════
 
   @OnEvent('cdr.created')
+  async onCdrCreatedEvent(cdrDocument: CdrDocument): Promise<void> {
+    const isListenerEnabled =
+      this.configService.get<string>('ENABLE_CDR_LISTENER') === 'true';
+
+    if (!isListenerEnabled) {
+      this.logger.debug(
+        `[CDR LISTENER SUPPRESSED] Live CDR event ignored for CallId=${cdrDocument.callid}. (ENABLE_CDR_LISTENER is false)`,
+      );
+      return;
+    }
+
+    await this.handleCdrCreated(cdrDocument);
+  }
+
+  @OnEvent('cdr.test')
+  async onCdrTestEvent(cdrDocument: CdrDocument): Promise<void> {
+    this.logger.log(
+      `[MANUAL TEST CDR] Processing manual test CDR event for CallId=${cdrDocument.callid}`,
+    );
+    await this.handleCdrCreated(cdrDocument);
+  }
+
   async handleCdrCreated(cdrDocument: CdrDocument): Promise<void> {
     const callId = cdrDocument.callid;
     const dialNo = cdrDocument['dial-no'];
@@ -88,7 +110,9 @@ export class MissedCallSmsService {
     const duration = cdrDocument.duration;
     const reasonTerminated = cdrDocument['reason-terminated'];
 
-    this.logger.log(`CDR event received — callId: ${callId}`);
+    this.logger.log(
+      `[CDR INGEST] Received call event: CallId=${callId}, From=${fromNo}, Dial=${dialNo}, Duration=${duration}, Reason=${reasonTerminated}, FromDN=${fromDn}`,
+    );
 
     // ── Step 1: DID match ──────────────────────────────────────────────────
     const store = await this.storeConfigService.getStoreByDid(dialNo);
@@ -109,6 +133,10 @@ export class MissedCallSmsService {
 
     const storeId = (store as any)._id.toString();
     const storeName = store.storeName;
+
+    this.logger.log(
+      `[CDR INGEST] Store matched: "${storeName}" (DID: ${dialNo}, StoreId: ${storeId})`,
+    );
 
     // ── PART 4: Answered call check ────────────────────────────────────────
     // If this is NOT a missed call but an active thread exists → close it.
@@ -252,6 +280,9 @@ export class MissedCallSmsService {
 
     // ── Step 7: Send opening SMS ───────────────────────────────────────────
     const openingBody = this.buildOpeningSms(store);
+    this.logger.log(
+      `[OPENING SMS] Triggering opening SMS to ${fromNo} for "${storeName}": "${openingBody}"`,
+    );
     const sent = await this.sendWithRetry(fromNo, openingBody, MAX_SMS_RETRIES);
 
     if (sent) {
@@ -281,7 +312,7 @@ export class MissedCallSmsService {
 
   async handleInboundSms(payload: InboundSmsPayload): Promise<any> {
     const { from, body } = payload;
-    this.logger.log(`Inbound SMS from ${from}`);
+    this.logger.log(`[INBOUND SMS] Handling message from ${from}: "${body}"`);
 
     // ── Step 1: Global opt-out guard ───────────────────────────────────────
     if (await this.optOutService.isOptedOut(from)) {
@@ -338,6 +369,10 @@ export class MissedCallSmsService {
 
     // ── Step 6: Handle chatbot response ───────────────────────────────────
     const storeName = store?.storeName ?? '';
+
+    this.logger.log(
+      `[CHATBOT ASSISTANT] Generated reply for ${from}: "${chatbotResponse.replyText}" (BookingDetected=${chatbotResponse.bookingIntentDetected}, OptOut=${chatbotResponse.optOut})`,
+    );
 
     // LLM-detected opt-out
     if (chatbotResponse.optOut) {
