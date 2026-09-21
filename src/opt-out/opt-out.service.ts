@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { OptOut, OptOutDocument } from './opt-out.schema';
+import { getPhoneNumberVariations } from '../sms-threads/sms-threads.service';
 
 export interface AddOptOutPayload {
   callerNumber: string;
@@ -23,7 +24,9 @@ export class OptOutService {
    * Indexed lookup — O(log n).
    */
   async isOptedOut(callerNumber: string): Promise<boolean> {
-    const exists = await this.optOutModel.exists({ callerNumber }).exec();
+    const exists = await this.optOutModel
+      .exists({ callerNumber: { $in: getPhoneNumberVariations(callerNumber) } })
+      .exec();
     return exists !== null;
   }
 

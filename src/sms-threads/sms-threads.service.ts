@@ -12,6 +12,31 @@ import {
 
 export { ThreadStatus };
 
+export function getPhoneNumberVariations(phone: string): string[] {
+  if (!phone) return [];
+  const trimmed = phone.trim();
+  const digits = trimmed.replace(/\D/g, '');
+  const variations = new Set<string>();
+  variations.add(trimmed);
+  variations.add(digits);
+
+  if (digits.startsWith('61') && digits.length === 11) {
+    variations.add(`+${digits}`);
+    variations.add(digits);
+    variations.add(`0${digits.slice(2)}`);
+  } else if (digits.startsWith('04') && digits.length === 10) {
+    variations.add(digits);
+    variations.add(`61${digits.slice(1)}`);
+    variations.add(`+61${digits.slice(1)}`);
+  } else if (digits.startsWith('4') && digits.length === 9) {
+    variations.add(`0${digits}`);
+    variations.add(`61${digits}`);
+    variations.add(`+61${digits}`);
+  }
+
+  return Array.from(variations);
+}
+
 @Injectable()
 export class SmsThreadsService {
   private readonly logger = new Logger(SmsThreadsService.name);
@@ -30,7 +55,7 @@ export class SmsThreadsService {
   ): Promise<SmsThread | null> {
     return this.smsThreadModel
       .findOne({
-        callerNumber,
+        callerNumber: { $in: getPhoneNumberVariations(callerNumber) },
         storeId: new Types.ObjectId(storeId),
         status: { $nin: CLOSED_STATUSES },
       })
@@ -47,7 +72,7 @@ export class SmsThreadsService {
   ): Promise<SmsThread | null> {
     return this.smsThreadModel
       .findOne({
-        callerNumber,
+        callerNumber: { $in: getPhoneNumberVariations(callerNumber) },
         storeId: new Types.ObjectId(storeId),
       })
       .sort({ createdAt: -1 })
@@ -63,7 +88,7 @@ export class SmsThreadsService {
   ): Promise<SmsThread | null> {
     return this.smsThreadModel
       .findOne({
-        callerNumber,
+        callerNumber: { $in: getPhoneNumberVariations(callerNumber) },
         status: { $nin: CLOSED_STATUSES },
       })
       .sort({ createdAt: -1 })
@@ -78,7 +103,7 @@ export class SmsThreadsService {
     callerNumber: string,
   ): Promise<SmsThread | null> {
     return this.smsThreadModel
-      .findOne({ callerNumber })
+      .findOne({ callerNumber: { $in: getPhoneNumberVariations(callerNumber) } })
       .sort({ createdAt: -1 })
       .exec();
   }
