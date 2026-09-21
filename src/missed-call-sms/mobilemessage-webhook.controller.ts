@@ -10,6 +10,7 @@ import {
   BadRequestException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
@@ -32,6 +33,7 @@ interface MobileMessageWebhookDto {
   [key: string]: any;
 }
 
+@ApiTags('MobileMessage Webhooks')
 @Controller()
 export class MobileMessageWebhookController {
   private readonly logger = new Logger(MobileMessageWebhookController.name);
@@ -47,6 +49,7 @@ export class MobileMessageWebhookController {
    * Also registered with alias /sms/webhook.
    */
   @Post('webhooks/mobilemessage')
+  @ApiOperation({ summary: 'Webhook endpoint for MobileMessage inbound SMS replies' })
   @HttpCode(HttpStatus.OK)
   async handleMobileMessageWebhook(
     @Body() payload: MobileMessageWebhookDto,

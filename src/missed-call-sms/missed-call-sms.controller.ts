@@ -1,6 +1,7 @@
 // TEST ONLY — remove or guard before production
 
 import { Controller, Post, Body } from '@nestjs/common';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MissedCallSmsService } from './missed-call-sms.service';
 import { SmsThreadsService } from '../sms-threads/sms-threads.service';
@@ -11,6 +12,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { SmsThread, SmsThreadDocument } from '../sms-threads/sms-thread.schema';
 
+@ApiTags('Simulation & Testing')
 @Controller('test')
 export class MissedCallSmsController {
   constructor(
