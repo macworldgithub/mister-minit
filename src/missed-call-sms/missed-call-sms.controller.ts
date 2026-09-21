@@ -25,11 +25,39 @@ export class MissedCallSmsController {
 
   // ── POST /test/missed-call ────────────────────────────────────────────────
   @Post('missed-call')
-  async triggerMissedCall(@Body() body: { fromNo: string; dialNo: string }) {
+  async triggerMissedCall(
+    @Body()
+    body: {
+      fromNo?: string;
+      phone?: string;
+      to?: string;
+      dialNo?: string;
+    },
+  ) {
+    const phoneNumber = (body.fromNo || body.phone || body.to || '').trim();
+    if (!phoneNumber) {
+      return {
+        success: false,
+        message: 'Please provide your mobile number in { "phone": "+614..." }',
+      };
+    }
+
+    let dialNo = body.dialNo;
+    if (!dialNo) {
+      const stores = await this.storeConfigService.findAll();
+      const activeStore = stores.find((s) => s.isActive);
+      dialNo = activeStore?.did || stores[0]?.did;
+    }
+
+    if (!dialNo) {
+      return {
+        success: false,
+        message: 'No store configured in database. Please configure a store first.',
+      };
+    }
+
     const callId = `test-call-${Date.now()}`;
 
-    // FIX 1: from-dn set to a non-numeric extension string so the internal-
-    // extension check (< 6 digits, purely numeric) passes correctly.
     const mockCdr = {
       callid: callId,
       timestamp: new Date().toISOString(),
@@ -38,9 +66,9 @@ export class MissedCallSmsController {
       'time-answered': '',
       'time-end': new Date().toISOString(),
       'reason-terminated': 'src_participant_terminated',
-      'from-no': body.fromNo,
-      'from-dn': 'test-ext', // fixed: not a bare numeric extension
-      'dial-no': body.dialNo,
+      'from-no': phoneNumber,
+      'from-dn': 'test-ext',
+      'dial-no': dialNo,
     };
 
     // Call the handler directly and await completion
@@ -56,10 +84,10 @@ export class MissedCallSmsController {
     const thisCallCreatedThread = suppressedReason === null;
 
     const thread = thisCallCreatedThread
-      ? await this.smsThreadsService.findMostRecentByCallerNumber(body.fromNo)
+      ? await this.smsThreadsService.findMostRecentByCallerNumber(phoneNumber)
       : null;
 
-    const store = await this.storeConfigService.getStoreByDid(body.dialNo);
+    const store = await this.storeConfigService.getStoreByDid(dialNo);
 
     // Build opening SMS text only when a thread was actually created
     let openingSmsText: string | null = null;
@@ -83,37 +111,67 @@ export class MissedCallSmsController {
 
   // ── POST /test/emit-cdr ───────────────────────────────────────────────────
   @Post('emit-cdr')
-  async emitCdrEvent(
-    @Body()
-    body: {
-      fromNo: string;
-      dialNo: string;
-      duration?: string;
-      reasonTerminated?: string;
-    },
-  ) {
-    const callId = `emit-call-${Date.now()}`;
+  async emitCdrEvent(@Body() body: any) {
+    const fromNo = (
+      body['from-no'] ||
+      body.fromNo ||
+      body.phone ||
+      body.from ||
+      ''
+    ).trim();
+
+    if (!fromNo) {
+      return {
+        success: false,
+        message: 'Please provide the caller mobile number in "from-no" or "phone"',
+      };
+    }
+
+    let dialNo = body['dial-no'] || body.dialNo || body.to;
+    if (!dialNo) {
+      const stores = await this.storeConfigService.findAll();
+      const activeStore = stores.find((s) => s.isActive);
+      dialNo = activeStore?.did || stores[0]?.did;
+    }
+
+    const callId = body.callid || `depict-call-${Date.now()}`;
     const cdrPayload = {
       callid: callId,
-      timestamp: new Date().toISOString(),
+      timestamp: body.timestamp || new Date().toISOString(),
       duration: body.duration || '00:00:05',
-      'time-start': new Date().toISOString(),
-      'time-answered': '',
-      'time-end': new Date().toISOString(),
+      'time-start': body['time-start'] || new Date().toISOString(),
+      'time-answered': body['time-answered'] || '',
+      'time-end': body['time-end'] || new Date().toISOString(),
       'reason-terminated':
-        body.reasonTerminated || 'src_participant_terminated',
-      'from-no': body.fromNo,
-      'from-dn': 'test-ext',
-      'dial-no': body.dialNo,
+        body['reason-terminated'] ||
+        body.reasonTerminated ||
+        'src_participant_terminated',
+      'from-no': fromNo,
+      'from-dn': body['from-dn'] || body.fromDn || 'test-ext',
+      'dial-no': dialNo,
     };
 
-    this.eventEmitter.emit('cdr.test', cdrPayload);
+    // Run the complete CDR ingestion & qualification logic
+    await this.missedCallSmsService.handleCdrCreated(cdrPayload);
+
+    // Check if this specific call passed or was suppressed
+    const suppressedEvent =
+      await this.suppressedEventsService.findByCallId(callId);
+    const thread =
+      await this.smsThreadsService.findMostRecentByCallerNumber(fromNo);
 
     return {
       success: true,
-      message: 'Manually emitted CDR test event via EventEmitter (cdr.test)',
-      callId,
-      payload: cdrPayload,
+      message: suppressedEvent
+        ? `Call evaluated but suppressed: ${suppressedEvent.suppressedReason}`
+        : 'Call qualified as missed call — opening SMS dispatched!',
+      evaluatedCdr: cdrPayload,
+      result: {
+        qualifiedAndSmsSent: !suppressedEvent,
+        suppressedReason: suppressedEvent?.suppressedReason || null,
+        threadId: (thread as any)?._id || null,
+        threadStatus: thread?.status || null,
+      },
     };
   }
 
