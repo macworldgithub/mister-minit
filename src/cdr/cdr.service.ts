@@ -189,18 +189,8 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
   }
 
   private executeBusinessLogic(cdr: any) {
-    // Internal call filter: Ignore if 'from-dn' contains a value
-    if (cdr['from-dn'] !== '') {
-      this.logger.debug(`Ignored internal call from DN: ${cdr['from-dn']}`);
-      return;
-    }
-
-    // Missed-call detection logic: A call is considered missed if the 'time-answered' field is completely empty.
-    if (cdr['time-answered'] === '') {
-      this.triggerMissedCallSMS(cdr['from-no'], cdr['dial-no']).catch((err) => {
-        this.logger.error(`Error triggering SMS: ${err.message}`, err.stack);
-      });
-    }
+    // Legacy stub: Production missed-call and SMS handling is managed by MissedCallSmsService via the 'cdr.created' event.
+    this.logger.debug(`CDR business logic passed to event listeners for call: ${cdr.callid}`);
   }
 
   private async triggerMissedCallSMS(customerNumber: string, storeDID: string) {

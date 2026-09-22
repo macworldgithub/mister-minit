@@ -43,8 +43,10 @@ export interface InboundSmsPayload {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const MOBILE_REGEX = /^(\+614|04)\d{8}$/;
-const INTERNAL_EXTENSION_REGEX = /^\d{1,5}$/;
+// Supports Australian mobile formats: +614..., 614..., 04..., and 014...
+const MOBILE_REGEX = /^(\+?614|0[14])\d{8}$/;
+// Matches internal PBX extensions (e.g., Ext.1001, 1211, 9999) on from-no
+const INTERNAL_EXTENSION_REGEX = /^(\d{1,5}|ext\.?\s*\d+|\w*extension\w*)$/i;
 const OPT_OUT_KEYWORDS = new Set([
   'STOP',
   'STOPALL',
@@ -183,7 +185,30 @@ export class MissedCallSmsService {
       return;
     }
 
-    // ── Step 3: Valid mobile ───────────────────────────────────────────────
+    // ── Step 3: Check if internal extension ────────────────────────────────
+    // Check if the caller number itself is an internal extension (e.g. "Ext.1001", "1211", "9999")
+    // Note: fromDn is NOT checked because 3CX populates fromDn with trunk IDs (e.g. 10001, 10008) for external calls.
+    if (fromNo && INTERNAL_EXTENSION_REGEX.test(fromNo.trim())) {
+      await this.doSuppress({
+        callerNumber: fromNo,
+        did: dialNo,
+        storeId,
+        storeName,
+        callId,
+        suppressedReason: SuppressedReason.INTERNAL_EXTENSION,
+      });
+      await this.loggingService.log(LogEventType.CALL_SUPPRESSED, {
+        callerNumber: fromNo,
+        storeId,
+        storeName,
+        callId,
+        metadata: { reason: SuppressedReason.INTERNAL_EXTENSION },
+      });
+      return;
+    }
+
+    // ── Step 4: Valid Australian mobile check ──────────────────────────────
+    // If not a valid Australian mobile (e.g. landlines starting with 02/03/07/08 or non-Australian numbers)
     if (!MOBILE_REGEX.test(fromNo)) {
       await this.doSuppress({
         callerNumber: fromNo,
@@ -199,19 +224,6 @@ export class MissedCallSmsService {
         storeName,
         callId,
         metadata: { reason: SuppressedReason.NOT_MOBILE },
-      });
-      return;
-    }
-
-    // ── Step 4: Internal extension ─────────────────────────────────────────
-    if (INTERNAL_EXTENSION_REGEX.test(fromDn)) {
-      await this.doSuppress({
-        callerNumber: fromNo,
-        did: dialNo,
-        storeId,
-        storeName,
-        callId,
-        suppressedReason: SuppressedReason.INTERNAL_EXTENSION,
       });
       return;
     }
