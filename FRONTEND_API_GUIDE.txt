@@ -21,10 +21,14 @@ Swagger Interactive Docs: https://www.mister-minit.omnisuiteai.com/api
 
 Screen Element                     | API Endpoint to Call
 -----------------------------------|------------------------------------------
-1. Store Filter Dropdown           | GET /stats/stores
-2. Top KPI Cards & Summary Charts  | GET /stats (or GET /stats?storeId=...)
-3. Store Comparison Table          | GET /stats/by-store
-4. Live System Logs & Audit Feed   | GET /logs/recent
+1. Overview - Store Selector       | GET /stats/stores
+2. Overview - KPI Cards & Charts   | GET /stats (or GET /stats?storeId=...)
+3. Overview - Store Comparison     | GET /stats/by-store
+4. Overview - Live Audit Feed      | GET /logs/recent
+5. SMS Concierge (Live Threads)    | GET /sms-threads/live
+6. Store Configs                   | GET /store-config
+7. 3CX Call Logs (Pilot Stores)    | GET /cdr/logs (or GET /cdr/logs?storeId=...)
+8. Suppression & Opt-outs          | GET /suppressions & GET /suppressions/opt-outs
 
 ==============================================================================
 3. DETAILED API REFERENCE & INTEGRATION
@@ -230,8 +234,200 @@ Example Response:
 }
 
 ==============================================================================
-5. NEED HELP OR MORE FIELDS?
+5. MODULE: SMS CONCIERGE (LIVE THREADS & ONGOING CHATS)
+==============================================================================
+Endpoint: GET /sms-threads/live
+Description: Returns active, ongoing SMS threads that are NOT closed and NOT 
+suppressed. Shows the current thread state and the full ongoing chat history 
+between the customer and the AI concierge.
+
+Query Parameters (Optional):
+  - storeId: (string) Filter by Store ObjectId
+  - did    : (string) Filter by Store DID phone number
+  - search : (string) Search customer mobile number (e.g. ?search=0412)
+  - limit  : (number) Number of items per page (default: 50)
+  - skip   : (number) Pagination offset (default: 0)
+
+Example Response:
+{
+  "total": 1,
+  "limit": 50,
+  "skip": 0,
+  "threads": [
+    {
+      "id": "66f012ab9c812d45a0b12345",
+      "callerNumber": "+61412345678",
+      "did": "0872286100",
+      "storeId": "6a9ea2774d7dcfbae9cc58b6",
+      "storeName": "Marion",
+      "tradingHours": "Mon-Fri 9:00am - 5:30pm",
+      "googleMapsLink": "https://maps.google.com/?cid=12345",
+      "status": "active",
+      "customerReplied": true,
+      "messageCount": 3,
+      "bookingCaptured": false,
+      "bookingDetails": null,
+      "conversationHistory": [
+        {
+          "role": "assistant",
+          "content": "Hi, sorry we missed your call to Mister Minit Marion! How can we help you today?",
+          "sentAt": "2026-09-22T08:00:05.000Z"
+        },
+        {
+          "role": "user",
+          "content": "Can I get my car key battery replaced today?",
+          "sentAt": "2026-09-22T08:01:20.000Z"
+        },
+        {
+          "role": "assistant",
+          "content": "Yes! We replace car key batteries on the spot at Mister Minit Marion. Pop in during trading hours!",
+          "sentAt": "2026-09-22T08:01:25.000Z"
+        }
+      ],
+      "openingSentAt": "2026-09-22T08:00:05.000Z",
+      "lastInteractionAt": "2026-09-22T08:01:25.000Z",
+      "followUpSentAt": null,
+      "createdAt": "2026-09-22T08:00:00.000Z",
+      "updatedAt": "2026-09-22T08:01:25.000Z"
+    }
+  ]
+}
+
+Single Thread Detail Endpoint:
+Endpoint: GET /sms-threads/:id
+
+==============================================================================
+6. MODULE: 3CX CALL LOGS (PILOT STORE CALL RECORDS)
+==============================================================================
+Endpoint: GET /cdr/logs
+Description: Returns 3CX telephony call records STRICTLY filtered to those stores 
+configured in StoreConfig. Automatically enriches every record with the storeName, 
+storeId, and whether the call was a missed call or answered.
+
+Query Parameters (Optional):
+  - storeId  : (string) Filter to specific store
+  - did      : (string) Filter to specific store DID
+  - isMissed : ("true" | "false") Filter missed calls vs answered calls
+  - search   : (string) Search caller number
+  - startDate: (ISO date string)
+  - endDate  : (ISO date string)
+  - limit    : (number) Default: 50
+  - skip     : (number) Default: 0
+
+Example Response:
+{
+  "total": 42,
+  "limit": 50,
+  "skip": 0,
+  "logs": [
+    {
+      "id": "66f023bc9c812d45a0b98765",
+      "callId": "call-10023",
+      "timestamp": "2026-09-22T08:15:00.000Z",
+      "timeStart": "2026/09/22 08:14:55",
+      "timeAnswered": "",
+      "timeEnd": "2026/09/22 08:15:00",
+      "duration": "00:00:05",
+      "durationSeconds": 5,
+      "reasonTerminated": "src_participant_terminated",
+      "fromNo": "0435594154",
+      "fromDn": "10008",
+      "dialNo": "0872286100",
+      "storeId": "6a9ea2774d7dcfbae9cc58b6",
+      "storeName": "Marion",
+      "isMissed": true,
+      "callStatus": "missed",
+      "createdAt": "2026-09-22T08:15:01.000Z"
+    }
+  ]
+}
+
+==============================================================================
+7. MODULE: SUPPRESSION & OPT-OUTS
+==============================================================================
+API 7A: Suppressed Call Events
+Endpoint: GET /suppressions
+Description: Returns all suppressed telephony calls that did not trigger an SMS 
+(e.g. not a mobile, not a missed call, internal extension, opted out, etc.).
+
+Query Parameters (Optional):
+  - reason   : (string) e.g. "not_mobile", "not_missed_call", "internal_extension", "opted_out", "dedup", "not_a_pilot_store"
+  - storeId  : (string) Filter by store
+  - search   : (string) Search caller number
+  - startDate: (ISO date string)
+  - endDate  : (ISO date string)
+  - limit    : (number) Default: 50
+  - skip     : (number) Default: 0
+
+Example Response:
+{
+  "total": 12,
+  "limit": 50,
+  "skip": 0,
+  "events": [
+    {
+      "id": "66f034cd9c812d45a0b54321",
+      "callerNumber": "0298765432",
+      "did": "0872286100",
+      "storeId": "6a9ea2774d7dcfbae9cc58b6",
+      "storeName": "Marion",
+      "callId": "call-10024",
+      "suppressedReason": "not_mobile",
+      "createdAt": "2026-09-22T08:20:00.000Z"
+    }
+  ]
+}
+
+API 7B: Customer Opt-Outs
+Endpoint: GET /suppressions/opt-outs
+Description: Returns the list of mobile numbers that have opted out via STOP 
+or LLM intent.
+
+Query Parameters (Optional):
+  - search   : (string) Search caller mobile number
+  - source   : ("keyword" | "llm_detected")
+  - startDate: (ISO date string)
+  - endDate  : (ISO date string)
+  - limit    : (number) Default: 50
+  - skip     : (number) Default: 0
+
+Example Response:
+{
+  "total": 2,
+  "limit": 50,
+  "skip": 0,
+  "optOuts": [
+    {
+      "id": "66f045de9c812d45a0b65432",
+      "callerNumber": "+61412999888",
+      "keyword": "STOP",
+      "source": "keyword",
+      "threadId": "66f012ab9c812d45a0b12345",
+      "optOutAt": "2026-09-22T08:30:00.000Z",
+      "createdAt": "2026-09-22T08:30:00.000Z"
+    }
+  ]
+}
+
+API 7C: Suppression & Opt-Outs Summary
+Endpoint: GET /suppressions/summary
+Description: Returns aggregated counts for top summary cards.
+
+Example Response:
+{
+  "totalSuppressed": 15,
+  "byReason": {
+    "not_mobile": 8,
+    "not_missed_call": 5,
+    "dedup": 2
+  },
+  "totalOptOuts": 2
+}
+
+==============================================================================
+8. NEED HELP OR MORE FIELDS?
 ==============================================================================
 Visit the interactive Swagger documentation anytime at:
 https://www.mister-minit.omnisuiteai.com/api
 ==============================================================================
+

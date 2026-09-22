@@ -9,6 +9,7 @@ import { Model } from 'mongoose';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cdr, CdrDocument } from './cdr.schema';
 import { CreateCdrDto } from './cdr.dto';
+import { StoreConfigService } from '../store-config/store-config.service';
 import * as net from 'net';
 
 const MAX_BUFFER_SIZE = 10 * 1024; // 10KB
@@ -22,6 +23,7 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @InjectModel(Cdr.name) private cdrModel: Model<CdrDocument>,
     private eventEmitter: EventEmitter2,
+    private storeConfigService: StoreConfigService,
   ) {}
 
   onModuleInit() {
@@ -198,4 +200,157 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
       `[SMS TRIGGER] Missed call detected! From: ${customerNumber}, To: ${storeDID}`,
     );
   }
+
+  /**
+   * Retrieves 3CX call logs strictly filtered to DIDs stored in store configs,
+   * enriched with storeName, storeId, isMissed, durationSeconds, and callStatus.
+   */
+  async findStoreCdrLogs(filter: {
+    storeId?: string;
+    did?: string;
+    isMissed?: boolean;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+    skip?: number;
+  }): Promise<{
+    total: number;
+    limit: number;
+    skip: number;
+    logs: any[];
+  }> {
+    const limit = Math.min(Math.max(filter.limit || 50, 1), 200);
+    const skip = Math.max(filter.skip || 0, 0);
+
+    // 1. Fetch all store configs to build DID-to-Store map
+    const stores = await this.storeConfigService.findAll();
+    const didToStoreMap = new Map<string, { storeId: string; storeName: string }>();
+
+    for (const store of stores) {
+      if (store.did) {
+        didToStoreMap.set(store.did.trim(), {
+          storeId: (store as any)._id.toString(),
+          storeName: store.storeName,
+        });
+      }
+    }
+
+    // 2. Determine target DIDs (strictly only DIDs from store configs)
+    let targetDids = Array.from(didToStoreMap.keys());
+
+    if (filter.storeId) {
+      const specificStore = stores.find(
+        (s) => (s as any)._id.toString() === filter.storeId,
+      );
+      if (!specificStore || !specificStore.did) {
+        return { total: 0, limit, skip, logs: [] };
+      }
+      targetDids = [specificStore.did.trim()];
+    } else if (filter.did) {
+      const cleanDid = filter.did.trim();
+      if (!didToStoreMap.has(cleanDid)) {
+        return { total: 0, limit, skip, logs: [] };
+      }
+      targetDids = [cleanDid];
+    }
+
+    if (targetDids.length === 0) {
+      return { total: 0, limit, skip, logs: [] };
+    }
+
+    // 3. Build MongoDB query
+    const query: Record<string, any> = {
+      'dial-no': { $in: targetDids },
+    };
+
+    if (filter.search && filter.search.trim()) {
+      const cleanSearch = filter.search.trim();
+      query['from-no'] = { $regex: cleanSearch, $options: 'i' };
+    }
+
+    // Date range
+    if (filter.startDate || filter.endDate) {
+      query.createdAt = {};
+      if (filter.startDate) {
+        query.createdAt.$gte = new Date(filter.startDate);
+      }
+      if (filter.endDate) {
+        query.createdAt.$lte = new Date(filter.endDate);
+      }
+    }
+
+    // Missed call filter at query level when possible
+    if (filter.isMissed === true) {
+      query['reason-terminated'] = 'src_participant_terminated';
+    }
+
+    const [total, docs] = await Promise.all([
+      this.cdrModel.countDocuments(query).exec(),
+      this.cdrModel
+        .find(query)
+        .sort({ createdAt: -1, timestamp: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+    ]);
+
+    const logs = docs
+      .map((doc) => {
+        const obj = doc.toObject() as any;
+        const did = (obj['dial-no'] || '').trim();
+        const storeInfo = didToStoreMap.get(did) || {
+          storeId: '',
+          storeName: 'Unknown Store',
+        };
+
+        const durationStr = obj.duration || '00:00:00';
+        const durationSecs = this.parseDurationToSeconds(durationStr);
+        const reason = obj['reason-terminated'] || '';
+        const isMissed =
+          reason === 'src_participant_terminated' && durationSecs < 10;
+
+        return {
+          id: obj._id ? obj._id.toString() : obj.callid,
+          callId: obj.callid,
+          timestamp: obj.timestamp,
+          timeStart: obj['time-start'] || null,
+          timeAnswered: obj['time-answered'] || null,
+          timeEnd: obj['time-end'] || null,
+          duration: durationStr,
+          durationSeconds: durationSecs,
+          reasonTerminated: reason,
+          fromNo: obj['from-no'] || '',
+          fromDn: obj['from-dn'] || '',
+          dialNo: did,
+          storeId: storeInfo.storeId,
+          storeName: storeInfo.storeName,
+          isMissed,
+          callStatus: isMissed ? 'missed' : 'answered',
+          createdAt: obj.createdAt,
+        };
+      })
+      .filter((item) => {
+        if (filter.isMissed === undefined) return true;
+        return item.isMissed === filter.isMissed;
+      });
+
+    return {
+      total: filter.isMissed === undefined ? total : logs.length,
+      limit,
+      skip,
+      logs,
+    };
+  }
+
+  private parseDurationToSeconds(duration: string): number {
+    if (!duration || !duration.trim()) return 0;
+    const parts = duration.trim().split(':');
+    if (parts.length !== 3) return 0;
+    const hours = parseInt(parts[0], 10) || 0;
+    const minutes = parseInt(parts[1], 10) || 0;
+    const seconds = parseInt(parts[2], 10) || 0;
+    return hours * 3600 + minutes * 60 + seconds;
+  }
 }
+

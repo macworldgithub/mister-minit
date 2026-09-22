@@ -66,4 +66,64 @@ export class OptOutService {
       throw err;
     }
   }
+
+  /**
+   * Retrieves paginated opt-out records with optional search filter.
+   */
+  async findOptOuts(filter: {
+    search?: string;
+    source?: 'keyword' | 'llm_detected';
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+    skip?: number;
+  }): Promise<{
+    total: number;
+    limit: number;
+    skip: number;
+    optOuts: any[];
+  }> {
+    const limit = Math.min(Math.max(filter.limit || 50, 1), 200);
+    const skip = Math.max(filter.skip || 0, 0);
+
+    const query: Record<string, any> = {};
+
+    if (filter.search && filter.search.trim()) {
+      query.callerNumber = { $regex: filter.search.trim(), $options: 'i' };
+    }
+    if (filter.source) {
+      query.source = filter.source;
+    }
+    if (filter.startDate || filter.endDate) {
+      query.optOutAt = {};
+      if (filter.startDate) query.optOutAt.$gte = new Date(filter.startDate);
+      if (filter.endDate) query.optOutAt.$lte = new Date(filter.endDate);
+    }
+
+    const [total, docs] = await Promise.all([
+      this.optOutModel.countDocuments(query).exec(),
+      this.optOutModel
+        .find(query)
+        .sort({ optOutAt: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+    ]);
+
+    const optOuts = docs.map((doc) => {
+      const obj = doc.toObject() as any;
+      return {
+        id: obj._id ? obj._id.toString() : '',
+        callerNumber: obj.callerNumber,
+        keyword: obj.keyword,
+        source: obj.source,
+        threadId: obj.threadId,
+        optOutAt: obj.optOutAt,
+        createdAt: obj.createdAt,
+      };
+    });
+
+    return { total, limit, skip, optOuts };
+  }
 }
+
