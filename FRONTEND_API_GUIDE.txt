@@ -26,9 +26,11 @@ Screen Element                     | API Endpoint to Call
 3. Overview - Store Comparison     | GET /stats/by-store
 4. Overview - Live Audit Feed      | GET /logs/recent
 5. SMS Concierge (Live Threads)    | GET /sms-threads/live
-6. Store Configs                   | GET /store-config
-7. 3CX Call Logs (Pilot Stores)    | GET /cdr/logs (or GET /cdr/logs?storeId=...)
-8. Suppression & Opt-outs          | GET /suppressions & GET /suppressions/opt-outs
+6. SMS Concierge (Closed Threads)  | GET /sms-threads/closed
+7. SMS Concierge (All Threads)     | GET /sms-threads
+8. Store Configs                   | GET /store-config
+9. 3CX Call Logs (Pilot Stores)    | GET /cdr/logs (or GET /cdr/logs?storeId=...)
+10. Suppression & Opt-outs         | GET /suppressions & GET /suppressions/opt-outs
 
 ==============================================================================
 3. DETAILED API REFERENCE & INTEGRATION
@@ -234,21 +236,65 @@ Example Response:
 }
 
 ==============================================================================
-5. MODULE: SMS CONCIERGE (LIVE THREADS & ONGOING CHATS)
+5. MODULE: SMS CONCIERGE (LIVE & CLOSED THREADS)
 ==============================================================================
+
+API 5A: Live / Open SMS Threads
 Endpoint: GET /sms-threads/live
-Description: Returns active, ongoing SMS threads that are NOT closed and NOT 
-suppressed. Shows the current thread state and the full ongoing chat history 
-between the customer and the AI concierge.
+Description: Returns active, ongoing SMS threads that are NOT closed.
+By default returns all live threads (pending, sms_sent, active, booking_requested).
 
 Query Parameters (Optional):
+  - status : (string) Filter by live status:
+             • "sms_sent"          : Opening SMS sent, awaiting customer reply
+             • "active"            : Ongoing back-and-forth AI chat
+             • "booking_requested" : Customer requested a booking / timeslot
+             • "pending"           : Initial state before SMS dispatch
+             • comma-separated     : e.g. "?status=active,booking_requested"
   - storeId: (string) Filter by Store ObjectId
   - did    : (string) Filter by Store DID phone number
   - search : (string) Search customer mobile number (e.g. ?search=0412)
   - limit  : (number) Number of items per page (default: 50)
   - skip   : (number) Pagination offset (default: 0)
 
-Example Response:
+------------------------------------------------------------------------------
+API 5B: Dedicated Closed SMS Threads
+Endpoint: GET /sms-threads/closed
+Description: Returns closed SMS threads. By default returns all closed statuses.
+
+Query Parameters (Optional):
+  - status : (string) Filter by specific closed status:
+             • "closed"            : (default) Returns all closed threads
+             • "closed_visited"    : Only threads where customer confirmed a visit/booking
+             • "closed_answered"   : Calls answered or closed upon store conversation
+             • "closed_no_response": Timed out after day-3 reminder (72h no reply)
+             • "closed_opted_out"  : Customer opted out (STOP / UNSUBSCRIBE)
+             • comma-separated     : e.g. "?status=closed_visited,closed_answered"
+  - storeId: (string) Filter by Store ObjectId
+  - did    : (string) Filter by Store DID phone number
+  - search : (string) Search customer mobile number (e.g. ?search=0412)
+  - limit  : (number) Number of items per page (default: 50)
+  - skip   : (number) Pagination offset (default: 0)
+
+------------------------------------------------------------------------------
+API 5C: All Threads (Unfiltered Master View)
+Endpoint: GET /sms-threads
+Description: Returns all SMS threads across all statuses (open and closed).
+
+Query Parameters (Optional):
+  - status : (string) Filter by any status (default: "all", or "live", "closed", "active", "closed_visited", etc.)
+  - storeId: (string) Filter by Store ObjectId
+  - did    : (string) Filter by Store DID phone number
+  - search : (string) Search customer mobile number
+  - limit  : (number) Default: 50
+  - skip   : (number) Default: 0
+
+------------------------------------------------------------------------------
+API 5D: Single Thread Detail
+Endpoint: GET /sms-threads/:id
+Description: Returns single SMS thread with complete conversation history.
+
+Example Thread Response Object (for 5A, 5B, 5C, 5D):
 {
   "total": 1,
   "limit": 50,
@@ -292,9 +338,6 @@ Example Response:
     }
   ]
 }
-
-Single Thread Detail Endpoint:
-Endpoint: GET /sms-threads/:id
 
 ==============================================================================
 6. MODULE: 3CX CALL LOGS (PILOT STORE CALL RECORDS)

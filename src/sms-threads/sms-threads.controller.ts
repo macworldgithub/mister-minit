@@ -13,12 +13,14 @@ export class SmsThreadsController {
     description:
       'Returns active, non-closed, non-suppressed SMS threads with ongoing conversation history, current status, caller number, and store metadata.',
   })
+  @ApiQuery({ name: 'status', required: false, description: 'Filter by thread status (default "live", supports "all", "closed", "closed_visited", or comma-separated)' })
   @ApiQuery({ name: 'storeId', required: false, description: 'Filter by Store ObjectId' })
   @ApiQuery({ name: 'did', required: false, description: 'Filter by Store DID phone number' })
   @ApiQuery({ name: 'search', required: false, description: 'Search caller mobile number' })
   @ApiQuery({ name: 'limit', required: false, description: 'Number of results to return (default 50)' })
   @ApiQuery({ name: 'skip', required: false, description: 'Number of results to skip (default 0)' })
   async getLiveThreads(
+    @Query('status') status?: string,
     @Query('storeId') storeId?: string,
     @Query('did') did?: string,
     @Query('search') search?: string,
@@ -26,6 +28,37 @@ export class SmsThreadsController {
     @Query('skip') skip?: string,
   ) {
     return this.smsThreadsService.findLiveThreads({
+      status,
+      storeId,
+      did,
+      search,
+      limit: limit ? parseInt(limit, 10) : 50,
+      skip: skip ? parseInt(skip, 10) : 0,
+    });
+  }
+
+  @Get('closed')
+  @ApiOperation({
+    summary: 'Get closed SMS Concierge threads',
+    description:
+      'Returns closed SMS threads (closed_visited, closed_answered, closed_no_response, closed_opted_out) with conversation history, store details, and status filtering.',
+  })
+  @ApiQuery({ name: 'status', required: false, description: 'Filter by specific closed status (default "closed", supports "closed_visited", "closed_answered", "closed_no_response", "closed_opted_out", or comma-separated)' })
+  @ApiQuery({ name: 'storeId', required: false, description: 'Filter by Store ObjectId' })
+  @ApiQuery({ name: 'did', required: false, description: 'Filter by Store DID phone number' })
+  @ApiQuery({ name: 'search', required: false, description: 'Search caller mobile number' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Number of results to return (default 50)' })
+  @ApiQuery({ name: 'skip', required: false, description: 'Number of results to skip (default 0)' })
+  async getClosedThreads(
+    @Query('status') status?: string,
+    @Query('storeId') storeId?: string,
+    @Query('did') did?: string,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+    @Query('skip') skip?: string,
+  ) {
+    return this.smsThreadsService.findClosedThreads({
+      status,
       storeId,
       did,
       search,
@@ -52,9 +85,9 @@ export class SmsThreadsController {
   @ApiOperation({
     summary: 'Query all SMS threads with optional status and store filters',
     description:
-      'Filter threads by status ("live", "all", "sms_sent", "active", "booking_requested", "closed_visited", etc.).',
+      'Filter threads by status ("all", "live", "closed", "sms_sent", "active", "booking_requested", "closed_visited", etc.). Defaults to all threads.',
   })
-  @ApiQuery({ name: 'status', required: false, description: 'Filter by thread status (default "live")' })
+  @ApiQuery({ name: 'status', required: false, description: 'Filter by thread status (default "all")' })
   @ApiQuery({ name: 'storeId', required: false, description: 'Filter by Store ObjectId' })
   @ApiQuery({ name: 'did', required: false, description: 'Filter by Store DID phone number' })
   @ApiQuery({ name: 'search', required: false, description: 'Search caller mobile number' })
@@ -69,7 +102,7 @@ export class SmsThreadsController {
     @Query('skip') skip?: string,
   ) {
     return this.smsThreadsService.findAllThreads({
-      status,
+      status: status || 'all',
       storeId,
       did,
       search,

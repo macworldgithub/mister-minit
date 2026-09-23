@@ -277,9 +277,11 @@ export class SmsThreadsService {
   }
 
   /**
-   * Returns live / ongoing SMS threads that are NOT suppressed or closed.
+   * Returns live / ongoing SMS threads that are NOT suppressed or closed (by default),
+   * or filters by custom status if provided.
    */
   async findLiveThreads(filter: {
+    status?: string;
     storeId?: string;
     did?: string;
     search?: string;
@@ -293,12 +295,35 @@ export class SmsThreadsService {
   }> {
     return this.findAllThreads({
       ...filter,
-      status: 'live',
+      status: filter.status || 'live',
     });
   }
 
   /**
-   * Finds threads with optional filtering by status (live, closed, etc.), storeId, search.
+   * Returns closed SMS threads (closed_visited, closed_answered, closed_no_response, closed_opted_out),
+   * or filters by specific closed status if provided.
+   */
+  async findClosedThreads(filter: {
+    status?: string;
+    storeId?: string;
+    did?: string;
+    search?: string;
+    limit?: number;
+    skip?: number;
+  }): Promise<{
+    total: number;
+    limit: number;
+    skip: number;
+    threads: any[];
+  }> {
+    return this.findAllThreads({
+      ...filter,
+      status: filter.status || 'closed',
+    });
+  }
+
+  /**
+   * Finds threads with optional filtering by status (live, closed, all, or specific statuses), storeId, search.
    */
   async findAllThreads(filter: {
     storeId?: string;
@@ -319,10 +344,23 @@ export class SmsThreadsService {
     const query: Record<string, any> = {};
 
     // Status filter
-    if (filter.status === 'live' || !filter.status) {
-      query.status = { $nin: CLOSED_STATUSES };
-    } else if (filter.status !== 'all') {
-      query.status = filter.status;
+    if (filter.status) {
+      const rawStatus = filter.status.trim().toLowerCase();
+      if (rawStatus === 'all') {
+        // No status filtering: return all threads
+      } else if (rawStatus === 'live') {
+        query.status = { $nin: CLOSED_STATUSES };
+      } else if (rawStatus === 'closed') {
+        query.status = { $in: CLOSED_STATUSES };
+      } else if (rawStatus.includes(',')) {
+        const statuses = rawStatus
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        query.status = { $in: statuses };
+      } else {
+        query.status = rawStatus;
+      }
     }
 
     // Store filter

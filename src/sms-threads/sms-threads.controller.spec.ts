@@ -8,6 +8,7 @@ describe('SmsThreadsController', () => {
 
   const mockThreadsService = {
     findLiveThreads: jest.fn(),
+    findClosedThreads: jest.fn(),
     findAllThreads: jest.fn(),
     findThreadById: jest.fn(),
   };
@@ -35,12 +36,61 @@ describe('SmsThreadsController', () => {
     const mockResult = { total: 1, limit: 50, skip: 0, threads: [{ id: '1', status: 'active' }] };
     mockThreadsService.findLiveThreads.mockResolvedValue(mockResult);
 
-    const result = await controller.getLiveThreads(undefined, undefined, undefined, '25', '0');
+    const result = await controller.getLiveThreads(undefined, undefined, undefined, undefined, '25', '0');
     expect(service.findLiveThreads).toHaveBeenCalledWith({
+      status: undefined,
       storeId: undefined,
       did: undefined,
       search: undefined,
       limit: 25,
+      skip: 0,
+    });
+    expect(result).toEqual(mockResult);
+  });
+
+  it('should pass status filter to findLiveThreads on GET /live', async () => {
+    const mockResult = { total: 1, limit: 50, skip: 0, threads: [{ id: '1', status: 'closed_visited' }] };
+    mockThreadsService.findLiveThreads.mockResolvedValue(mockResult);
+
+    const result = await controller.getLiveThreads('closed_visited', undefined, undefined, undefined, '25', '0');
+    expect(service.findLiveThreads).toHaveBeenCalledWith({
+      status: 'closed_visited',
+      storeId: undefined,
+      did: undefined,
+      search: undefined,
+      limit: 25,
+      skip: 0,
+    });
+    expect(result).toEqual(mockResult);
+  });
+
+  it('should call findClosedThreads on GET /closed', async () => {
+    const mockResult = { total: 1, limit: 50, skip: 0, threads: [{ id: '1', status: 'closed_visited' }] };
+    mockThreadsService.findClosedThreads.mockResolvedValue(mockResult);
+
+    const result = await controller.getClosedThreads('closed_visited', undefined, undefined, undefined, '25', '0');
+    expect(service.findClosedThreads).toHaveBeenCalledWith({
+      status: 'closed_visited',
+      storeId: undefined,
+      did: undefined,
+      search: undefined,
+      limit: 25,
+      skip: 0,
+    });
+    expect(result).toEqual(mockResult);
+  });
+
+  it('should call findAllThreads with status all by default on GET /', async () => {
+    const mockResult = { total: 2, limit: 50, skip: 0, threads: [] };
+    mockThreadsService.findAllThreads.mockResolvedValue(mockResult);
+
+    const result = await controller.getAllThreads(undefined, undefined, undefined, undefined, '50', '0');
+    expect(service.findAllThreads).toHaveBeenCalledWith({
+      status: 'all',
+      storeId: undefined,
+      did: undefined,
+      search: undefined,
+      limit: 50,
       skip: 0,
     });
     expect(result).toEqual(mockResult);
