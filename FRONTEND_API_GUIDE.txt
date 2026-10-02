@@ -253,11 +253,9 @@ Query Parameters (Optional):
              • comma-separated     : e.g. "?status=active,booking_requested"
   - storeId: (string) Filter by Store ObjectId
   - did    : (string) Filter by Store DID phone number
-  - search   : (string) Search customer mobile number (e.g. ?search=0412)
-  - startDate: (ISO date) Filter threads created on or after date (e.g. ?startDate=2026-09-25)
-  - endDate  : (ISO date) Filter threads created on or before date (e.g. ?endDate=2026-10-02)
-  - limit    : (number) Number of items per page (default: 50)
-  - skip     : (number) Pagination offset (default: 0)
+  - search : (string) Search customer mobile number (e.g. ?search=0412)
+  - limit  : (number) Number of items per page (default: 50)
+  - skip   : (number) Pagination offset (default: 0)
 
 ------------------------------------------------------------------------------
 API 5B: Dedicated Closed SMS Threads
@@ -265,20 +263,18 @@ Endpoint: GET /sms-threads/closed
 Description: Returns closed SMS threads. By default returns all closed statuses.
 
 Query Parameters (Optional):
-  - status   : (string) Filter by specific closed status:
+  - status : (string) Filter by specific closed status:
              • "closed"            : (default) Returns all closed threads
              • "closed_visited"    : Only threads where customer confirmed a visit/booking
              • "closed_answered"   : Calls answered or closed upon store conversation
              • "closed_no_response": Timed out after day-3 reminder (72h no reply)
              • "closed_opted_out"  : Customer opted out (STOP / UNSUBSCRIBE)
              • comma-separated     : e.g. "?status=closed_visited,closed_answered"
-  - storeId  : (string) Filter by Store ObjectId
-  - did      : (string) Filter by Store DID phone number
-  - search   : (string) Search customer mobile number (e.g. ?search=0412)
-  - startDate: (ISO date) Filter threads created on or after date
-  - endDate  : (ISO date) Filter threads created on or before date
-  - limit    : (number) Number of items per page (default: 50)
-  - skip     : (number) Pagination offset (default: 0)
+  - storeId: (string) Filter by Store ObjectId
+  - did    : (string) Filter by Store DID phone number
+  - search : (string) Search customer mobile number (e.g. ?search=0412)
+  - limit  : (number) Number of items per page (default: 50)
+  - skip   : (number) Pagination offset (default: 0)
 
 ------------------------------------------------------------------------------
 API 5C: All Threads (Unfiltered Master View)
@@ -286,14 +282,12 @@ Endpoint: GET /sms-threads
 Description: Returns all SMS threads across all statuses (open and closed).
 
 Query Parameters (Optional):
-  - status   : (string) Filter by any status (default: "all", or "live", "closed", "active", "closed_visited", etc.)
-  - storeId  : (string) Filter by Store ObjectId
-  - did      : (string) Filter by Store DID phone number
-  - search   : (string) Search customer mobile number
-  - startDate: (ISO date) Filter threads created on or after date
-  - endDate  : (ISO date) Filter threads created on or before date
-  - limit    : (number) Default: 50
-  - skip     : (number) Default: 0
+  - status : (string) Filter by any status (default: "all", or "live", "closed", "active", "closed_visited", etc.)
+  - storeId: (string) Filter by Store ObjectId
+  - did    : (string) Filter by Store DID phone number
+  - search : (string) Search customer mobile number
+  - limit  : (number) Default: 50
+  - skip   : (number) Default: 0
 
 ------------------------------------------------------------------------------
 API 5D: Single Thread Detail

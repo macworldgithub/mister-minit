@@ -17,8 +17,6 @@ export class SmsThreadsController {
   @ApiQuery({ name: 'storeId', required: false, description: 'Filter by Store ObjectId' })
   @ApiQuery({ name: 'did', required: false, description: 'Filter by Store DID phone number' })
   @ApiQuery({ name: 'search', required: false, description: 'Search caller mobile number' })
-  @ApiQuery({ name: 'startDate', required: false, description: 'Filter threads created after or on this date (ISO string YYYY-MM-DD)' })
-  @ApiQuery({ name: 'endDate', required: false, description: 'Filter threads created before or on this date (ISO string YYYY-MM-DD)' })
   @ApiQuery({ name: 'limit', required: false, description: 'Number of results to return (default 50)' })
   @ApiQuery({ name: 'skip', required: false, description: 'Number of results to skip (default 0)' })
   async getLiveThreads(
@@ -26,8 +24,6 @@ export class SmsThreadsController {
     @Query('storeId') storeId?: string,
     @Query('did') did?: string,
     @Query('search') search?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
     @Query('limit') limit?: string,
     @Query('skip') skip?: string,
   ) {
@@ -36,8 +32,6 @@ export class SmsThreadsController {
       storeId,
       did,
       search,
-      startDate,
-      endDate,
       limit: limit ? parseInt(limit, 10) : 50,
       skip: skip ? parseInt(skip, 10) : 0,
     });
@@ -53,8 +47,6 @@ export class SmsThreadsController {
   @ApiQuery({ name: 'storeId', required: false, description: 'Filter by Store ObjectId' })
   @ApiQuery({ name: 'did', required: false, description: 'Filter by Store DID phone number' })
   @ApiQuery({ name: 'search', required: false, description: 'Search caller mobile number' })
-  @ApiQuery({ name: 'startDate', required: false, description: 'Filter threads created after or on this date (ISO string YYYY-MM-DD)' })
-  @ApiQuery({ name: 'endDate', required: false, description: 'Filter threads created before or on this date (ISO string YYYY-MM-DD)' })
   @ApiQuery({ name: 'limit', required: false, description: 'Number of results to return (default 50)' })
   @ApiQuery({ name: 'skip', required: false, description: 'Number of results to skip (default 0)' })
   async getClosedThreads(
@@ -62,8 +54,6 @@ export class SmsThreadsController {
     @Query('storeId') storeId?: string,
     @Query('did') did?: string,
     @Query('search') search?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
     @Query('limit') limit?: string,
     @Query('skip') skip?: string,
   ) {
@@ -72,8 +62,6 @@ export class SmsThreadsController {
       storeId,
       did,
       search,
-      startDate,
-      endDate,
       limit: limit ? parseInt(limit, 10) : 50,
       skip: skip ? parseInt(skip, 10) : 0,
     });
@@ -103,8 +91,6 @@ export class SmsThreadsController {
   @ApiQuery({ name: 'storeId', required: false, description: 'Filter by Store ObjectId' })
   @ApiQuery({ name: 'did', required: false, description: 'Filter by Store DID phone number' })
   @ApiQuery({ name: 'search', required: false, description: 'Search caller mobile number' })
-  @ApiQuery({ name: 'startDate', required: false, description: 'Filter threads created after or on this date (ISO string YYYY-MM-DD)' })
-  @ApiQuery({ name: 'endDate', required: false, description: 'Filter threads created before or on this date (ISO string YYYY-MM-DD)' })
   @ApiQuery({ name: 'limit', required: false, description: 'Number of results to return (default 50)' })
   @ApiQuery({ name: 'skip', required: false, description: 'Number of results to skip (default 0)' })
   async getAllThreads(
@@ -112,8 +98,6 @@ export class SmsThreadsController {
     @Query('storeId') storeId?: string,
     @Query('did') did?: string,
     @Query('search') search?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
     @Query('limit') limit?: string,
     @Query('skip') skip?: string,
   ) {
@@ -122,8 +106,6 @@ export class SmsThreadsController {
       storeId,
       did,
       search,
-      startDate,
-      endDate,
       limit: limit ? parseInt(limit, 10) : 50,
       skip: skip ? parseInt(skip, 10) : 0,
     });
