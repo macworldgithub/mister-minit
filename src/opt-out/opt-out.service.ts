@@ -97,7 +97,13 @@ export class OptOutService {
     if (filter.startDate || filter.endDate) {
       query.optOutAt = {};
       if (filter.startDate) query.optOutAt.$gte = new Date(filter.startDate);
-      if (filter.endDate) query.optOutAt.$lte = new Date(filter.endDate);
+      if (filter.endDate) {
+        const end = new Date(filter.endDate);
+        if (filter.endDate.length <= 10) {
+          end.setUTCHours(23, 59, 59, 999);
+        }
+        query.optOutAt.$lte = end;
+      }
     }
 
     const [total, docs] = await Promise.all([

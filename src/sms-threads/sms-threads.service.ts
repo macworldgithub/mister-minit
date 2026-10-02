@@ -285,6 +285,8 @@ export class SmsThreadsService {
     storeId?: string;
     did?: string;
     search?: string;
+    startDate?: string;
+    endDate?: string;
     limit?: number;
     skip?: number;
   }): Promise<{
@@ -308,6 +310,8 @@ export class SmsThreadsService {
     storeId?: string;
     did?: string;
     search?: string;
+    startDate?: string;
+    endDate?: string;
     limit?: number;
     skip?: number;
   }): Promise<{
@@ -330,6 +334,8 @@ export class SmsThreadsService {
     did?: string;
     search?: string;
     status?: string;
+    startDate?: string;
+    endDate?: string;
     limit?: number;
     skip?: number;
   }): Promise<{
@@ -375,6 +381,21 @@ export class SmsThreadsService {
     if (filter.search && filter.search.trim()) {
       const cleanSearch = filter.search.trim();
       query.callerNumber = { $regex: cleanSearch, $options: 'i' };
+    }
+
+    // Date range filter
+    if (filter.startDate || filter.endDate) {
+      query.createdAt = {};
+      if (filter.startDate) {
+        const start = new Date(filter.startDate);
+        start.setUTCHours(0, 0, 0, 0);
+        query.createdAt.$gte = start;
+      }
+      if (filter.endDate) {
+        const end = new Date(filter.endDate);
+        end.setUTCHours(23, 59, 59, 999);
+        query.createdAt.$lte = end;
+      }
     }
 
     const [total, docs] = await Promise.all([

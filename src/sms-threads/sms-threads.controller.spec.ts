@@ -36,12 +36,14 @@ describe('SmsThreadsController', () => {
     const mockResult = { total: 1, limit: 50, skip: 0, threads: [{ id: '1', status: 'active' }] };
     mockThreadsService.findLiveThreads.mockResolvedValue(mockResult);
 
-    const result = await controller.getLiveThreads(undefined, undefined, undefined, undefined, '25', '0');
+    const result = await controller.getLiveThreads(undefined, undefined, undefined, undefined, undefined, undefined, '25', '0');
     expect(service.findLiveThreads).toHaveBeenCalledWith({
       status: undefined,
       storeId: undefined,
       did: undefined,
       search: undefined,
+      startDate: undefined,
+      endDate: undefined,
       limit: 25,
       skip: 0,
     });
@@ -52,12 +54,14 @@ describe('SmsThreadsController', () => {
     const mockResult = { total: 1, limit: 50, skip: 0, threads: [{ id: '1', status: 'closed_visited' }] };
     mockThreadsService.findLiveThreads.mockResolvedValue(mockResult);
 
-    const result = await controller.getLiveThreads('closed_visited', undefined, undefined, undefined, '25', '0');
+    const result = await controller.getLiveThreads('closed_visited', undefined, undefined, undefined, '2026-09-25', '2026-10-02', '25', '0');
     expect(service.findLiveThreads).toHaveBeenCalledWith({
       status: 'closed_visited',
       storeId: undefined,
       did: undefined,
       search: undefined,
+      startDate: '2026-09-25',
+      endDate: '2026-10-02',
       limit: 25,
       skip: 0,
     });
@@ -68,12 +72,14 @@ describe('SmsThreadsController', () => {
     const mockResult = { total: 1, limit: 50, skip: 0, threads: [{ id: '1', status: 'closed_visited' }] };
     mockThreadsService.findClosedThreads.mockResolvedValue(mockResult);
 
-    const result = await controller.getClosedThreads('closed_visited', undefined, undefined, undefined, '25', '0');
+    const result = await controller.getClosedThreads('closed_visited', undefined, undefined, undefined, undefined, undefined, '25', '0');
     expect(service.findClosedThreads).toHaveBeenCalledWith({
       status: 'closed_visited',
       storeId: undefined,
       did: undefined,
       search: undefined,
+      startDate: undefined,
+      endDate: undefined,
       limit: 25,
       skip: 0,
     });
@@ -84,12 +90,14 @@ describe('SmsThreadsController', () => {
     const mockResult = { total: 2, limit: 50, skip: 0, threads: [] };
     mockThreadsService.findAllThreads.mockResolvedValue(mockResult);
 
-    const result = await controller.getAllThreads(undefined, undefined, undefined, undefined, '50', '0');
+    const result = await controller.getAllThreads(undefined, undefined, undefined, undefined, undefined, undefined, '50', '0');
     expect(service.findAllThreads).toHaveBeenCalledWith({
       status: 'all',
       storeId: undefined,
       did: undefined,
       search: undefined,
+      startDate: undefined,
+      endDate: undefined,
       limit: 50,
       skip: 0,
     });

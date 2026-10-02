@@ -92,7 +92,13 @@ export class SuppressedEventsService {
     if (filter.startDate || filter.endDate) {
       query.createdAt = {};
       if (filter.startDate) query.createdAt.$gte = new Date(filter.startDate);
-      if (filter.endDate) query.createdAt.$lte = new Date(filter.endDate);
+      if (filter.endDate) {
+        const end = new Date(filter.endDate);
+        if (filter.endDate.length <= 10) {
+          end.setUTCHours(23, 59, 59, 999);
+        }
+        query.createdAt.$lte = end;
+      }
     }
 
     const [total, docs] = await Promise.all([

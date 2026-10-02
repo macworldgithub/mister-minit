@@ -46,7 +46,13 @@ export class StatsService {
     if (filter.startDate || filter.endDate) {
       dateQuery.createdAt = {};
       if (filter.startDate) dateQuery.createdAt.$gte = new Date(filter.startDate);
-      if (filter.endDate) dateQuery.createdAt.$lte = new Date(filter.endDate);
+      if (filter.endDate) {
+        const end = new Date(filter.endDate);
+        if (filter.endDate.length <= 10) {
+          end.setUTCHours(23, 59, 59, 999);
+        }
+        dateQuery.createdAt.$lte = end;
+      }
     }
 
     // ── 1. Telephony Stats (from `cdr`) ─────────────────────────────────────

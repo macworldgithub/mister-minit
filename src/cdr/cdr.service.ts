@@ -276,7 +276,11 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
         query.createdAt.$gte = new Date(filter.startDate);
       }
       if (filter.endDate) {
-        query.createdAt.$lte = new Date(filter.endDate);
+        const end = new Date(filter.endDate);
+        if (filter.endDate.length <= 10) {
+          end.setUTCHours(23, 59, 59, 999);
+        }
+        query.createdAt.$lte = end;
       }
     }
 
