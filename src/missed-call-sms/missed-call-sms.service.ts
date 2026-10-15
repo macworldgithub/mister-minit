@@ -33,6 +33,17 @@ interface CdrDocument {
   'from-no': string;
   'from-dn': string;
   'dial-no': string;
+  'to-no'?: string;
+  'to-dn'?: string;
+  'reason-changed'?: string;
+  'final-number'?: string;
+  'final-dn'?: string;
+  chain?: string;
+  'from-type'?: string;
+  'to-type'?: string;
+  'final-type'?: string;
+  'from-dispname'?: string;
+  'missed-queue-calls'?: string;
   _id?: any;
 }
 
@@ -142,7 +153,14 @@ export class MissedCallSmsService {
 
     // ── PART 4: Answered call check ────────────────────────────────────────
     // If this is NOT a missed call but an active thread exists → close it.
-    const isMissedCall = this.checkMissedCall(reasonTerminated, duration);
+    const missedQueueCalls = cdrDocument['missed-queue-calls'];
+    const finalType = cdrDocument['final-type'];
+    const isMissedCall = this.checkMissedCall(
+      reasonTerminated,
+      duration,
+      missedQueueCalls,
+      finalType,
+    );
     if (!isMissedCall) {
       const totalSecs = this.parseDurationToSeconds(duration);
       if (totalSecs >= 10 && MOBILE_REGEX.test(fromNo)) {
@@ -650,10 +668,30 @@ export class MissedCallSmsService {
   // PRIVATE HELPERS
   // ══════════════════════════════════════════════════════════════════════════
 
-  private checkMissedCall(reasonTerminated: string, duration: string): boolean {
-    if (reasonTerminated !== 'src_participant_terminated') return false;
-    const secs = this.parseDurationToSeconds(duration);
-    return secs < 10;
+  private checkMissedCall(
+    reasonTerminated: string,
+    duration: string,
+    missedQueueCalls?: string,
+    finalType?: string,
+  ): boolean {
+    // 1. Explicit 3CX Missed Queue Call flag
+    if (missedQueueCalls) {
+      const trimmed = missedQueueCalls.trim().toLowerCase();
+      if (trimmed !== '' && trimmed !== '0' && trimmed !== 'false') {
+        return true;
+      }
+    }
+
+    // 2. Caller abandoned/dropped while at a Queue or IVR
+    if (reasonTerminated === 'src_participant_terminated') {
+      if (finalType && finalType.trim().toLowerCase() === 'queue') {
+        return true; // Dropped in queue regardless of hold duration!
+      }
+      const secs = this.parseDurationToSeconds(duration);
+      return secs < 10;
+    }
+
+    return false;
   }
 
   private parseDurationToSeconds(duration: string): number {

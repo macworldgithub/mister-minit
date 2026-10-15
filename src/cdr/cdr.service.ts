@@ -148,8 +148,27 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
         'from-no': fields[6] || '',
         'from-dn': fields[7] || '',
         'dial-no': fields[8] || '',
+        'to-no': fields[9] || '',
+        'to-dn': fields[10] || '',
+        'reason-changed': fields[11] || '',
+        'final-number': fields[12] || '',
+        'final-dn': fields[13] || '',
+        chain: fields[14] || '',
+        'from-type': fields[15] || '',
+        'to-type': fields[16] || '',
+        'final-type': fields[17] || '',
+        'from-dispname': fields[18] || '',
+        'missed-queue-calls': fields[19] || '',
         timestamp: new Date().toISOString(),
       };
+
+      console.log('\n=================== [3CX CDR INCOMING EVENT] ===================');
+      console.log(`[RAW CDR LINE]: ${rawData}`);
+      console.log(`[PARSED CDR]: CallId=${dto.callid} | From=${dto['from-no']} | Dialed=${dto['dial-no']} | ToNo=${dto['to-no']}`);
+      console.log(`[ROUTING TRACE]: Chain="${dto.chain}" | FinalNo=${dto['final-number']} | FinalType=${dto['final-type']} | FinalDN=${dto['final-dn']}`);
+      console.log(`[STATUS]: ReasonTerminated=${dto['reason-terminated']} | ReasonChanged=${dto['reason-changed']} | MissedQueueCalls=${dto['missed-queue-calls']} | Duration=${dto.duration}`);
+      console.log('[FULL DTO]:', JSON.stringify(dto, null, 2));
+      console.log('=================================================================\n');
 
       this.logger.log(`Successfully parsed CDR: ${dto.callid}`);
       this.logger.debug(`Parsed CDR Details: ${JSON.stringify(dto)}`);
@@ -310,9 +329,15 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
 
         const durationStr = obj.duration || '00:00:00';
         const durationSecs = this.parseDurationToSeconds(durationStr);
-        const reason = obj['reason-terminated'] || '';
+        const missedQueue = (obj['missed-queue-calls'] || '').trim();
+        const hasMissedQueue =
+          missedQueue !== '' &&
+          missedQueue !== '0' &&
+          missedQueue.toLowerCase() !== 'false';
+
         const isMissed =
-          reason === 'src_participant_terminated' && durationSecs < 10;
+          (reason === 'src_participant_terminated' && durationSecs < 10) ||
+          hasMissedQueue;
 
         return {
           id: obj._id ? obj._id.toString() : obj.callid,
@@ -327,6 +352,17 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
           fromNo: obj['from-no'] || '',
           fromDn: obj['from-dn'] || '',
           dialNo: did,
+          toNo: obj['to-no'] || '',
+          toDn: obj['to-dn'] || '',
+          reasonChanged: obj['reason-changed'] || '',
+          finalNumber: obj['final-number'] || '',
+          finalDn: obj['final-dn'] || '',
+          chain: obj.chain || '',
+          fromType: obj['from-type'] || '',
+          toType: obj['to-type'] || '',
+          finalType: obj['final-type'] || '',
+          fromDispname: obj['from-dispname'] || '',
+          missedQueueCalls: obj['missed-queue-calls'] || '',
           storeId: storeInfo.storeId,
           storeName: storeInfo.storeName,
           isMissed,
