@@ -71,17 +71,41 @@ export class StatsService {
           isMissed: {
             $cond: [
               {
-                $and: [
-                  { $eq: ['$reason-terminated', 'src_participant_terminated'] },
+                $or: [
+                  // Rule 1: Dropped or unanswered in queue
                   {
-                    $or: [
-                      { $eq: ['$time-answered', ''] },
-                      { $not: ['$time-answered'] },
+                    $and: [
+                      { $eq: ['$final-type', 'queue'] },
                       {
-                        $regexMatch: {
-                          input: { $ifNull: ['$duration', ''] },
-                          regex: '^00:00:0[0-9]$',
-                        },
+                        $in: [
+                          '$reason-terminated',
+                          ['src_participant_terminated', 'no_answer'],
+                        ],
+                      },
+                    ],
+                  },
+                  // Rule 2: Explicit no_answer terminal reason
+                  { $eq: ['$reason-terminated', 'no_answer'] },
+                  // Rule 3: Caller abandoned early (<10s)
+                  {
+                    $and: [
+                      {
+                        $eq: [
+                          '$reason-terminated',
+                          'src_participant_terminated',
+                        ],
+                      },
+                      {
+                        $or: [
+                          { $eq: ['$time-answered', ''] },
+                          { $not: ['$time-answered'] },
+                          {
+                            $regexMatch: {
+                              input: { $ifNull: ['$duration', ''] },
+                              regex: '^00:00:0[0-9]$',
+                            },
+                          },
+                        ],
                       },
                     ],
                   },
