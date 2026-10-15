@@ -19,6 +19,7 @@ import { LogEventType } from '../logging/log.schema';
 import { ChatbotService } from '../chatbot/chatbot.service';
 import { SmsProviderService } from './sms-provider.service';
 import { MailService } from '../mail/mail.service';
+import { getMissedCallRule } from '../cdr/cdr-call-outcome.util';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -153,13 +154,10 @@ export class MissedCallSmsService {
 
     // ── PART 4: Answered call check ────────────────────────────────────────
     // If this is NOT a missed call but an active thread exists → close it.
-    const missedQueueCalls = cdrDocument['missed-queue-calls'];
-    const finalType = cdrDocument['final-type'];
-    const isMissedCall = this.checkMissedCall(
-      reasonTerminated,
-      duration,
-      missedQueueCalls,
-      finalType,
+    const missedRule = getMissedCallRule(cdrDocument);
+    const isMissedCall = missedRule !== null;
+    this.logger.log(
+      `[CDR OUTCOME] CallId=${callId} | FinalType=${cdrDocument['final-type'] || '-'} | FinalNo=${cdrDocument['final-number'] || '-'} | Reason=${reasonTerminated} | Duration=${duration} | Result=${isMissedCall ? `MISSED (${missedRule})` : 'ANSWERED'}`,
     );
     if (!isMissedCall) {
       const totalSecs = this.parseDurationToSeconds(duration);
@@ -667,32 +665,6 @@ export class MissedCallSmsService {
   // ══════════════════════════════════════════════════════════════════════════
   // PRIVATE HELPERS
   // ══════════════════════════════════════════════════════════════════════════
-
-  private checkMissedCall(
-    reasonTerminated: string,
-    duration: string,
-    missedQueueCalls?: string,
-    finalType?: string,
-  ): boolean {
-    // 1. Explicit 3CX Missed Queue Call flag
-    if (missedQueueCalls) {
-      const trimmed = missedQueueCalls.trim().toLowerCase();
-      if (trimmed !== '' && trimmed !== '0' && trimmed !== 'false') {
-        return true;
-      }
-    }
-
-    // 2. Caller abandoned/dropped while at a Queue or IVR
-    if (reasonTerminated === 'src_participant_terminated') {
-      if (finalType && finalType.trim().toLowerCase() === 'queue') {
-        return true; // Dropped in queue regardless of hold duration!
-      }
-      const secs = this.parseDurationToSeconds(duration);
-      return secs < 10;
-    }
-
-    return false;
-  }
 
   private parseDurationToSeconds(duration: string): number {
     if (!duration || !duration.trim()) return 0;

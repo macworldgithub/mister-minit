@@ -10,6 +10,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cdr, CdrDocument } from './cdr.schema';
 import { CreateCdrDto } from './cdr.dto';
 import { StoreConfigService } from '../store-config/store-config.service';
+import { getMissedCallRule } from './cdr-call-outcome.util';
 import * as net from 'net';
 
 const MAX_BUFFER_SIZE = 10 * 1024; // 10KB
@@ -303,9 +304,13 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    // Missed call filter at query level when possible
+    // Missed call filter at query level when possible.
+    // Both reasons can be a missed call (see cdr-call-outcome.util.ts);
+    // the exact rule is applied again per-record below.
     if (filter.isMissed === true) {
-      query['reason-terminated'] = 'src_participant_terminated';
+      query['reason-terminated'] = {
+        $in: ['src_participant_terminated', 'no_answer'],
+      };
     }
 
     const [total, docs] = await Promise.all([
@@ -330,15 +335,8 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
         const durationStr = obj.duration || '00:00:00';
         const durationSecs = this.parseDurationToSeconds(durationStr);
         const reason = obj['reason-terminated'] || '';
-        const missedQueue = (obj['missed-queue-calls'] || '').trim();
-        const hasMissedQueue =
-          missedQueue !== '' &&
-          missedQueue !== '0' &&
-          missedQueue.toLowerCase() !== 'false';
-
-        const isMissed =
-          (reason === 'src_participant_terminated' && durationSecs < 10) ||
-          hasMissedQueue;
+        const missedRule = getMissedCallRule(obj);
+        const isMissed = missedRule !== null;
 
         return {
           id: obj._id ? obj._id.toString() : obj.callid,
@@ -367,6 +365,7 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
           storeId: storeInfo.storeId,
           storeName: storeInfo.storeName,
           isMissed,
+          missedRule,
           callStatus: isMissed ? 'missed' : 'answered',
           createdAt: obj.createdAt,
         };
