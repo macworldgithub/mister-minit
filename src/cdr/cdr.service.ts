@@ -329,6 +329,7 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
 
         const durationStr = obj.duration || '00:00:00';
         const durationSecs = this.parseDurationToSeconds(durationStr);
+        const reason = obj['reason-terminated'] || '';
         const missedQueue = (obj['missed-queue-calls'] || '').trim();
         const hasMissedQueue =
           missedQueue !== '' &&
