@@ -41,6 +41,18 @@ export class StatsService {
     const storeIdStr = targetStore ? (targetStore as any)._id.toString() : null;
     const storeDid = targetStore ? targetStore.did : null;
 
+    // Fetch active pilot stores when no specific store is targeted
+    let pilotDids: string[] = [];
+    let pilotStoreIds: string[] = [];
+    if (!storeDid && !storeIdStr) {
+      const activeStores = await this.storeConfigModel.find().lean().exec();
+      const filteredStores = activeStores.filter(
+        (s: any) => s.isActive !== false && s.did,
+      );
+      pilotDids = filteredStores.map((s: any) => s.did.trim()).filter(Boolean);
+      pilotStoreIds = filteredStores.map((s: any) => String(s._id));
+    }
+
     // Date range filter
     const dateQuery: any = {};
     if (filter.startDate || filter.endDate) {
@@ -59,6 +71,8 @@ export class StatsService {
     const cdrMatch: any = {};
     if (storeDid) {
       cdrMatch['dial-no'] = storeDid;
+    } else if (pilotDids.length > 0) {
+      cdrMatch['dial-no'] = { $in: pilotDids };
     }
     if (filter.startDate || filter.endDate) {
       cdrMatch.createdAt = dateQuery.createdAt;
@@ -232,6 +246,14 @@ export class StatsService {
       suppressionMatch.$or = [];
       if (storeIdStr) suppressionMatch.$or.push({ storeId: storeIdStr });
       if (storeDid) suppressionMatch.$or.push({ did: storeDid });
+    } else if (pilotStoreIds.length > 0 || pilotDids.length > 0) {
+      suppressionMatch.$or = [];
+      if (pilotStoreIds.length > 0) {
+        suppressionMatch.$or.push({ storeId: { $in: pilotStoreIds } });
+      }
+      if (pilotDids.length > 0) {
+        suppressionMatch.$or.push({ did: { $in: pilotDids } });
+      }
     }
     if (filter.startDate || filter.endDate) {
       suppressionMatch.createdAt = dateQuery.createdAt;
