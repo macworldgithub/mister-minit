@@ -86,7 +86,9 @@ export class StatsService {
             $cond: [
               {
                 $or: [
-                  // Rule 1: Dropped or unanswered in queue
+                  // Rule 1: Customer reached voicemail
+                  { $eq: ['$final-type', 'voicemail'] },
+                  // Rule 2: Dropped or unanswered in queue
                   {
                     $and: [
                       { $eq: ['$final-type', 'queue'] },

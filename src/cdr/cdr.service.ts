@@ -305,12 +305,17 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Missed call filter at query level when possible.
-    // Both reasons can be a missed call (see cdr-call-outcome.util.ts);
+    // Both reasons can be a missed call, as well as any voicemail destination (see cdr-call-outcome.util.ts);
     // the exact rule is applied again per-record below.
     if (filter.isMissed === true) {
-      query['reason-terminated'] = {
-        $in: ['src_participant_terminated', 'no_answer'],
-      };
+      query.$or = [
+        {
+          'reason-terminated': {
+            $in: ['src_participant_terminated', 'no_answer'],
+          },
+        },
+        { 'final-type': 'voicemail' },
+      ];
     }
 
     const [total, docs] = await Promise.all([

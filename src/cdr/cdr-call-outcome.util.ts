@@ -12,6 +12,7 @@ export interface CdrOutcomeInput {
 }
 
 export type MissedCallRule =
+  | 'voicemail' // ended in voicemail (no agent picked up)
   | 'queue_unanswered' // ended while still sitting in a queue (no agent picked up)
   | 'short_hangup' // legacy rule: caller hung up in under 10 seconds
   | null; // not a missed call
@@ -35,17 +36,24 @@ export function parseDurationToSeconds(duration?: string): number {
 /**
  * Returns which rule classified the call as missed, or null if it was answered.
  *
- * Rule 1 (new): final-type === 'queue' means the call ended while still in a
+ * Rule 1 (voicemail): final-type === 'voicemail' means call rolled over to
+ *   voicemail because no agent answered.
+ *
+ * Rule 2 (queue): final-type === 'queue' means the call ended while still in a
  *   queue. Verified on live 3CX data: when an agent answers, 3CX changes
  *   final-type to 'extension'. So 'queue' at the end means no one answered,
  *   no matter how long the caller waited.
  *
- * Rule 2 (legacy, unchanged): caller hung up (src_participant_terminated)
+ * Rule 3 (legacy, unchanged): caller hung up (src_participant_terminated)
  *   in under 10 seconds. Also covers older records with no final-type.
  */
 export function getMissedCallRule(cdr: CdrOutcomeInput): MissedCallRule {
   const reason = (cdr['reason-terminated'] || '').trim();
   const finalType = (cdr['final-type'] || '').trim().toLowerCase();
+
+  if (finalType === 'voicemail') {
+    return 'voicemail';
+  }
 
   if (finalType === 'queue' && QUEUE_DROP_REASONS.has(reason)) {
     return 'queue_unanswered';

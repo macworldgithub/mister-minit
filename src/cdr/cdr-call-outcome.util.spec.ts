@@ -32,7 +32,28 @@ describe('getMissedCallRule', () => {
     ).toBeNull();
   });
 
-  // ── New rule ──────────────────────────────────────────────────────────────
+  // ── Voicemail rule ────────────────────────────────────────────────────────
+  it('call went to voicemail (src_participant_terminated, 15s) → missed', () => {
+    expect(
+      getMissedCallRule({
+        duration: '00:00:15',
+        'reason-terminated': 'src_participant_terminated',
+        'final-type': 'voicemail',
+      }),
+    ).toBe('voicemail');
+  });
+
+  it('call went to voicemail (dst_participant_terminated, 45s) → missed', () => {
+    expect(
+      getMissedCallRule({
+        duration: '00:00:45',
+        'reason-terminated': 'dst_participant_terminated',
+        'final-type': ' Voicemail ',
+      }),
+    ).toBe('voicemail');
+  });
+
+  // ── Queue rule ─────────────────────────────────────────────────────────────
   it('caller hung up while waiting in queue for 85s → missed', () => {
     expect(
       getMissedCallRule({
