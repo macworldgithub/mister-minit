@@ -88,7 +88,19 @@ export class StatsService {
                 $or: [
                   // Rule 1: Customer reached voicemail
                   { $eq: ['$final-type', 'voicemail'] },
-                  // Rule 2: Dropped or unanswered in queue
+                  // Rule 2: Caller abandoned in IVR menu
+                  {
+                    $and: [
+                      { $eq: ['$final-type', 'ivr'] },
+                      {
+                        $eq: [
+                          '$reason-terminated',
+                          'src_participant_terminated',
+                        ],
+                      },
+                    ],
+                  },
+                  // Rule 3: Dropped or unanswered in queue
                   {
                     $and: [
                       { $eq: ['$final-type', 'queue'] },

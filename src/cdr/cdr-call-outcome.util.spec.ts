@@ -53,6 +53,37 @@ describe('getMissedCallRule', () => {
     ).toBe('voicemail');
   });
 
+  // ── IVR drop rule ──────────────────────────────────────────────────────────
+  it('caller hung up while listening to IVR menu for 13s → missed (ivr_drop)', () => {
+    expect(
+      getMissedCallRule({
+        duration: '00:00:13',
+        'reason-terminated': 'src_participant_terminated',
+        'final-type': 'ivr',
+      }),
+    ).toBe('ivr_drop');
+  });
+
+  it('caller hung up in IVR menu under 10s → missed (ivr_drop)', () => {
+    expect(
+      getMissedCallRule({
+        duration: '00:00:03',
+        'reason-terminated': 'src_participant_terminated',
+        'final-type': 'ivr',
+      }),
+    ).toBe('ivr_drop');
+  });
+
+  it('IVR call terminated by system (dst_participant_terminated) → not missed', () => {
+    expect(
+      getMissedCallRule({
+        duration: '00:00:15',
+        'reason-terminated': 'dst_participant_terminated',
+        'final-type': 'ivr',
+      }),
+    ).toBeNull();
+  });
+
   // ── Queue rule ─────────────────────────────────────────────────────────────
   it('caller hung up while waiting in queue for 85s → missed', () => {
     expect(
