@@ -387,13 +387,13 @@ export class SmsThreadsService {
     if (filter.startDate || filter.endDate) {
       query.createdAt = {};
       if (filter.startDate) {
-        const start = new Date(filter.startDate);
-        start.setUTCHours(0, 0, 0, 0);
-        query.createdAt.$gte = start;
+        query.createdAt.$gte = new Date(filter.startDate);
       }
       if (filter.endDate) {
         const end = new Date(filter.endDate);
-        end.setUTCHours(23, 59, 59, 999);
+        if (filter.endDate.length <= 10) {
+          end.setUTCHours(23, 59, 59, 999);
+        }
         query.createdAt.$lte = end;
       }
     }
