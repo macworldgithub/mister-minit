@@ -315,6 +315,12 @@ export class MissedCallSmsService {
 
     if (sent) {
       await this.smsThreadsService.setOpeningSent(threadId);
+      await this.smsThreadsService.appendToHistory(threadId, {
+        role: 'assistant',
+        content: openingBody,
+        sentAt: new Date(),
+      });
+      await this.smsThreadsService.incrementMessageCount(threadId);
       await this.loggingService.log(LogEventType.OPENING_SMS_SENT, {
         callerNumber: fromNo,
         storeId,
@@ -619,6 +625,12 @@ export class MissedCallSmsService {
         const body = this.buildFollowUpSms(store);
         await this.sendWithRetry(thread.callerNumber, body, MAX_SMS_RETRIES);
         await this.smsThreadsService.setFollowUpSent(threadId);
+        await this.smsThreadsService.appendToHistory(threadId, {
+          role: 'assistant',
+          content: body,
+          sentAt: new Date(),
+        });
+        await this.smsThreadsService.incrementMessageCount(threadId);
 
         await this.loggingService.log(LogEventType.FOLLOW_UP_SENT, {
           callerNumber: thread.callerNumber,

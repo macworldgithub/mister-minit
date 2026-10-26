@@ -58,6 +58,8 @@ describe('MissedCallSmsService - buildOpeningSms', () => {
         findActiveThread: jest.fn().mockResolvedValue(null),
         createThread: jest.fn().mockResolvedValue({ _id: 'thread123' }),
         setOpeningSent: jest.fn().mockResolvedValue(true),
+        appendToHistory: jest.fn().mockResolvedValue(true),
+        incrementMessageCount: jest.fn().mockResolvedValue(true),
       };
       mockOptOutService = {
         isOptedOut: jest.fn().mockResolvedValue(false),

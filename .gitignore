@@ -116,3 +116,19 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Client Reports & Telephony Spreadsheets
+*.xlsx
+*.xls
+*.csv
+client_reports/
+
+# Generated Audit Reports & Temporary Artifacts
+*.pdf
+*Audit_Report*
+scripts/audit_raw.json
+scripts/preview_report.png
+scripts/preview_page.png
+scripts/inspect_data.js
+scripts/reconcile.py
+

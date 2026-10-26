@@ -1,0 +1,13 @@
+{
+  "reportTitle": "MISTER MINIT",
+  "reportSubtitle": "Missed Calls & SMS Outreach Verification Report",
+  "sectionTitle": "Detailed Call Activity & SMS Verification Log",
+  "startDate": "2026/10/13",
+  "endDate": "",
+  "auditWindowLabel": "13 Oct 2026 – 22 Oct 2026",
+  "storesAuditedLabel": "7 Pilot Locations",
+  "showCallout": false,
+  "summaryCalloutText": "",
+  "clientReportFiles": [],
+  "customNotes": {}
+}
