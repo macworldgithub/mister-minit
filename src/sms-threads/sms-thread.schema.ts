@@ -103,6 +103,12 @@ export class SmsThread {
   followUpSentAt: Date;
 
   @Prop({ type: Boolean, default: false })
+  callbackRequested: boolean;
+
+  @Prop({ type: Date, default: null })
+  callbackRequestedAt: Date;
+
+  @Prop({ type: Boolean, default: false })
   bookingCaptured: boolean;
 
   @Prop({ type: BookingDetailsSchema, default: null })

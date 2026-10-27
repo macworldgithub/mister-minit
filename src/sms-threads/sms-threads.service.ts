@@ -12,6 +12,13 @@ import {
 
 export { ThreadStatus };
 
+/** Follow-up is sent this many minutes after the opening SMS if no reply. */
+export const FOLLOW_UP_DELAY_MINUTES = 15;
+/** Thread is closed as no-response this many minutes after the follow-up. */
+export const CLOSE_AFTER_FOLLOW_UP_MINUTES = 45;
+/** Safety window: never send a follow-up for openings older than this. */
+export const FOLLOW_UP_MAX_AGE_HOURS = 6;
+
 export function getPhoneNumberVariations(phone: string): string[] {
   if (!phone) return [];
   const trimmed = phone.trim();
@@ -226,7 +233,7 @@ export class SmsThreadsService {
   }
 
   /**
-   * Marks the day-3 follow-up as sent.
+   * Marks the follow-up as sent.
    */
   async setFollowUpSent(threadId: string): Promise<void> {
     await this.smsThreadModel
@@ -235,19 +242,41 @@ export class SmsThreadsService {
   }
 
   /**
-   * Returns threads that are eligible to receive the day-3 follow-up:
+   * Records that the customer asked for a human callback.
+   */
+  async setCallbackRequested(threadId: string): Promise<void> {
+    await this.smsThreadModel
+      .updateOne(
+        { _id: threadId },
+        {
+          $set: {
+            callbackRequested: true,
+            callbackRequestedAt: new Date(),
+            lastInteractionAt: new Date(),
+          },
+        },
+      )
+      .exec();
+  }
+
+  /**
+   * Returns threads that are eligible to receive the follow-up:
    * - No customer reply
    * - Still in sms_sent status
-   * - Opening sent >= 72 hours ago
+   * - Opening sent >= FOLLOW_UP_DELAY_MINUTES ago (15 min)
+   * - Opening sent within FOLLOW_UP_MAX_AGE_HOURS (stale threads are skipped so
+   *   old customers are never texted when the scheduler is deployed/restarted)
    * - Follow-up not yet sent
    */
   async findThreadsForFollowUp(): Promise<SmsThread[]> {
-    const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000);
+    const now = Date.now();
+    const dueBefore = new Date(now - FOLLOW_UP_DELAY_MINUTES * 60 * 1000);
+    const notOlderThan = new Date(now - FOLLOW_UP_MAX_AGE_HOURS * 60 * 60 * 1000);
     return this.smsThreadModel
       .find({
         customerReplied: false,
         status: ThreadStatus.SMS_SENT,
-        openingSentAt: { $lte: cutoff },
+        openingSentAt: { $lte: dueBefore, $gte: notOlderThan },
         followUpSentAt: null,
       })
       .exec();
@@ -257,10 +286,10 @@ export class SmsThreadsService {
    * Returns threads to auto-close:
    * - No customer reply
    * - Still in sms_sent status
-   * - Follow-up already sent >= 72 hours ago
+   * - Follow-up already sent >= CLOSE_AFTER_FOLLOW_UP_MINUTES ago (45 min)
    */
   async findThreadsToClose(): Promise<SmsThread[]> {
-    const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000);
+    const cutoff = new Date(Date.now() - CLOSE_AFTER_FOLLOW_UP_MINUTES * 60 * 1000);
     return this.smsThreadModel
       .find({
         customerReplied: false,

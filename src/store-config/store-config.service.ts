@@ -35,6 +35,14 @@ export class StoreConfigService {
     return this.storeConfigModel.findOne({ did }).exec();
   }
 
+  async getStoreById(id: string): Promise<StoreConfig | null> {
+    try {
+      return await this.storeConfigModel.findById(id).exec();
+    } catch {
+      return null;
+    }
+  }
+
   async update(
     did: string,
     updateDto: UpdateStoreConfigDto,

@@ -104,7 +104,19 @@ CRITICAL: Never say "appointment confirmed" or "booked in"
 
 -If customer is angry, distressed, or complaining about a previous job, do not attempt to resolve:
 -If angry/complaining — acknowledge warmly and direct them to call {{STORE_DID}}. Generate wording naturally.
--If requesting a person — direct them to {{STORE_DID}} during {{STORE_TRADING_HOURS}}. Generate wording naturally.
+-If requesting a person — set humanCallbackRequested to true (see HUMAN CALLBACK below). Do not just give them the phone number.
+
+### HUMAN CALLBACK — FOLLOW-UP OFFER
+
+After a missed call we may send a follow-up message that ends with an offer such as: "Would you like one of our store team members to call you back instead? Reply YES".
+
+Set humanCallbackRequested to true when the customer wants a team member to call or contact them. This includes:
+- ANY affirmative answer to that offer, in ANY wording — not just "yes". Examples: "yeah", "yep", "yup", "sure", "ok", "okay", "please", "please do", "go ahead", "sounds good", "that would be great", "definitely", "absolutely", "y", "ya", "yes pls", "call me", "ring me", "👍", or equivalent in other words/typos.
+- Unprompted requests such as "can someone call me", "I'd rather speak to a person", "let me talk to a human", "get the manager to ring me".
+Use the conversation history: a short affirmative only counts when the most recent assistant message offered a callback (or the customer clearly asks for a person).
+Do NOT set it true when the customer says NO / not needed / "I'm fine", or when they simply ask a question (price, hours, address) — in that case answer normally with humanCallbackRequested false.
+If the customer says YES but ALSO asks a question in the same message, set humanCallbackRequested true AND answer the question briefly in replyText.
+When humanCallbackRequested is true, replyText should be a short confirmation that the store team has been notified and will call them back soon (the system may replace it with a fixed message).
 
 ### WHAT IS NEVER ALLOWED FOR CAR KEYS
 
@@ -125,6 +137,7 @@ no preamble, raw JSON only) in this exact structure:
   "optOut": boolean,
   "bookingIntentDetected": boolean,
   "emergencyEscalation": boolean,
+  "humanCallbackRequested": boolean,
   "bookingDetails": {
     "customerName": string | null,
     "preferredTime": string | null,
@@ -135,6 +148,9 @@ no preamble, raw JSON only) in this exact structure:
 }
 
 Rules for each field:
+
+humanCallbackRequested:
+  true when the customer wants a human team member to call them back (see HUMAN CALLBACK section). false in all other cases.
 
 emergencyEscalation:
   Set true when customer expresses ANY urgent, emergency, stranded, or ASAP situation (e.g. "urgent", "emergency", "asap", "stranded", "lost all keys", or confirms YES to an emergency question). Set false in all other cases.
@@ -191,7 +207,7 @@ Never use fixed sentence templates in replyText except:
 - Opt-out confirmation (legal requirement)
 - Opening SMS (flow document requirement)
 - Booking confirmation (flow document requirement)
-- 3-day follow-up (flow document requirement)
+- Follow-up message (flow document requirement)
 
 Every runtime reply must:
 - Be freshly generated based on the conversation context
@@ -220,6 +236,7 @@ Required structure — every field must be present:
   "optOut": false,
   "bookingIntentDetected": false,
   "emergencyEscalation": false,
+  "humanCallbackRequested": false,
   "bookingDetails": null,
   "threadShouldClose": false,
   "closeReason": null
@@ -974,6 +991,7 @@ export class ChatbotService {
         optOut: false,
         bookingIntentDetected: false,
         emergencyEscalation: false,
+        humanCallbackRequested: false,
         bookingDetails: null,
         threadShouldClose: false,
         closeReason: null,
@@ -1012,6 +1030,7 @@ export class ChatbotService {
         bookingIntentDetected: parsed.bookingIntentDetected ?? false,
         bookingDetails: parsed.bookingDetails ?? null,
         emergencyEscalation: parsed.emergencyEscalation ?? false,
+        humanCallbackRequested: parsed.humanCallbackRequested ?? false,
         threadShouldClose: parsed.threadShouldClose ?? false,
         closeReason: parsed.closeReason ?? null,
       };
@@ -1026,6 +1045,7 @@ export class ChatbotService {
         optOut: false,
         bookingIntentDetected: false,
         emergencyEscalation: false,
+        humanCallbackRequested: false,
         bookingDetails: null,
         threadShouldClose: false,
         closeReason: null,
@@ -1041,6 +1061,7 @@ export interface ChatbotResponse {
   replyText: string | null;
   optOut: boolean;
   emergencyEscalation: boolean;
+  humanCallbackRequested?: boolean;
   threadShouldClose: boolean;
   closeReason: string | null;
   bookingIntentDetected: boolean;

@@ -23,24 +23,50 @@ export class MailService {
   }
 
   async sendEmail(to: string | string[], subject: string, text: string) {
-    if (!to || (Array.isArray(to) && to.length === 0)) {
-      this.logger.warn('No recipient email address provided.');
+    const rawList = Array.isArray(to) ? to : [to];
+    const recipients = Array.from(
+      new Set(
+        rawList
+          .flatMap((r) => (r ? String(r).split(/[,;\s]+/) : []))
+          .map((r) => r.trim().toLowerCase())
+          .filter((r) => r && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r)),
+      ),
+    );
+
+    if (recipients.length === 0) {
+      this.logger.warn('No valid recipient email address provided.');
       return;
     }
 
-    try {
-      const from = this.configService.get<string>('SMTP_USER');
-      const recipients = Array.isArray(to) ? to.join(', ') : to;
+    const from = this.configService.get<string>('SMTP_USER');
 
+    try {
       await this.transporter.sendMail({
         from: `"Mister Minit Notifications" <${from}>`,
         to: recipients,
         subject,
         text,
       });
-      this.logger.log(`Email sent successfully to ${recipients}`);
+      this.logger.log(`Email sent successfully to: ${recipients.join(', ')}`);
     } catch (error: any) {
-      this.logger.error(`Failed to send email: ${error.message}`, error.stack);
+      this.logger.warn(
+        `Batch email send failed (${error.message}). Retrying each recipient individually...`,
+      );
+      for (const recipient of recipients) {
+        try {
+          await this.transporter.sendMail({
+            from: `"Mister Minit Notifications" <${from}>`,
+            to: recipient,
+            subject,
+            text,
+          });
+          this.logger.log(`Email sent successfully to ${recipient}`);
+        } catch (indivErr: any) {
+          this.logger.error(
+            `Failed to send email to ${recipient}: ${indivErr.message}`,
+          );
+        }
+      }
     }
   }
 }

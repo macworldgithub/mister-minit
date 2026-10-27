@@ -198,4 +198,242 @@ describe('MissedCallSmsService - buildOpeningSms', () => {
       );
     });
   });
+
+  describe('Store Name Replacement & Message Templates', () => {
+    let service: MissedCallSmsService;
+
+    beforeEach(() => {
+      service = new MissedCallSmsService(
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+      );
+    });
+
+    it('should correctly format store name when raw name is Marion', () => {
+      const mockStore: any = {
+        storeName: 'Marion',
+        did: '0872286100',
+      };
+
+      const opening = service.buildOpeningSms(mockStore);
+      expect(opening).toContain('Mister Minit Marion');
+
+      const followUp = service.buildFollowUpSms(mockStore);
+      expect(followUp).toContain(
+        "Hi, just checking in from Mister Minit Marion! Did you still need help? I'm our smart virtual assistant and can answer anything about our services or pricing.",
+      );
+      expect(followUp).toContain(
+        'Would you like one of our store team members to call you back instead? Reply YES',
+      );
+      expect(followUp).toContain('Reply STOP to opt out.');
+
+      const callbackConf = service.buildCallbackConfirmation(mockStore);
+      expect(callbackConf).toBe(
+        "Thanks! I've notified the team at Mister Minit Marion — you'll receive a call back soon. In the meantime, feel free to message me if you have any questions.",
+      );
+
+      const staffNotice = service.buildCallbackStaffNotification(
+        mockStore,
+        '0412345678',
+      );
+      expect(staffNotice).toContain('Callback request — Mister Minit Marion');
+      expect(staffNotice).toContain('Customer mobile: 0412345678');
+    });
+
+    it('should avoid duplicate prefix if storeName already contains Mister Minit', () => {
+      const mockStore: any = {
+        storeName: 'Mister Minit Westfield Doncaster',
+        did: '0370360236',
+      };
+
+      const followUp = service.buildFollowUpSms(mockStore);
+      expect(followUp).toContain(
+        'Hi, just checking in from Mister Minit Westfield Doncaster!',
+      );
+      expect(followUp).not.toContain('Mister Minit Mister Minit');
+
+      const callbackConf = service.buildCallbackConfirmation(mockStore);
+      expect(callbackConf).toContain(
+        "Thanks! I've notified the team at Mister Minit Westfield Doncaster — you'll receive a call back soon.",
+      );
+      expect(callbackConf).not.toContain('Mister Minit Mister Minit');
+    });
+
+    it('should handle null store gracefully with fallback Mister Minit', () => {
+      const followUp = service.buildFollowUpSms(null);
+      expect(followUp).toContain(
+        "Hi, just checking in from Mister Minit! Did you still need help?",
+      );
+
+      const callbackConf = service.buildCallbackConfirmation(null);
+      expect(callbackConf).toBe(
+        "Thanks! I've notified the team at Mister Minit — you'll receive a call back soon. In the meantime, feel free to message me if you have any questions.",
+      );
+    });
+  });
+
+  describe('Affirmative & YES Detection', () => {
+    let service: MissedCallSmsService;
+
+    beforeEach(() => {
+      service = new MissedCallSmsService(
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+      );
+    });
+
+    it('should detect plain affirmatives', () => {
+      const positives = [
+        'YES',
+        'yes',
+        'Yes please',
+        'yeah',
+        'Yep',
+        'sure',
+        'ok',
+        'okay',
+        'please do',
+        'sounds good',
+        'definitely',
+        'absolutely',
+        'call me please',
+        '👍',
+      ];
+
+      for (const phrase of positives) {
+        expect(service.isAffirmativeReply(phrase)).toBe(true);
+      }
+    });
+
+    it('should not treat questions or negative replies as plain affirmative', () => {
+      const nonPositives = [
+        'How much is a car key?',
+        'What time do you close?',
+        'No thanks',
+        'Not needed',
+        'Who is this?',
+      ];
+
+      for (const phrase of nonPositives) {
+        expect(service.isAffirmativeReply(phrase)).toBe(false);
+      }
+    });
+
+    it('should detect when callback offer is pending in history', () => {
+      const historyWithOffer = [
+        {
+          role: 'assistant',
+          content:
+            'Hi, just checking in! Would you like one of our store team members to call you back instead? Reply YES',
+        },
+      ];
+      expect(service.isCallbackOfferPending(historyWithOffer)).toBe(true);
+
+      const historyWithoutOffer = [
+        {
+          role: 'assistant',
+          content: 'We are open 9am to 5pm Monday to Friday.',
+        },
+      ];
+      expect(service.isCallbackOfferPending(historyWithoutOffer)).toBe(false);
+    });
+  });
+
+  describe('extractStoreEmails', () => {
+    let service: MissedCallSmsService;
+    let mockConfigService: any;
+
+    beforeEach(() => {
+      mockConfigService = {
+        get: jest.fn((key: string) => {
+          if (key === 'DEFAULT_NOTIFICATION_EMAIL') return 'default@neximet.com';
+          if (key === 'SMTP_USER') return 'smtp@neximet.com';
+          return null;
+        }),
+      };
+
+      service = new MissedCallSmsService(
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        mockConfigService,
+      );
+    });
+
+    it('should extract all emails attached to store staffContacts', () => {
+      const mockStore: any = {
+        storeName: 'Marion',
+        staffContacts: [
+          { name: 'Syed', email: 'syeddyaseenn@gmail.com', mobile: '0412345678' },
+          { name: 'Lee', email: 'lee@bele.ai', mobile: '0400000000' },
+          { name: 'James', email: 'james@smarttalk.com.au', mobile: '0411111111' },
+        ],
+      };
+
+      const emails = service.extractStoreEmails(mockStore);
+      expect(emails).toEqual([
+        'syeddyaseenn@gmail.com',
+        'lee@bele.ai',
+        'james@smarttalk.com.au',
+      ]);
+    });
+
+    it('should deduplicate and clean comma-separated or mixed-case emails', () => {
+      const mockStore: any = {
+        storeName: 'Enex Perth',
+        staffContacts: [
+          { name: 'Syed', email: ' SyEdDyAseenn@gmail.com ' },
+          { name: 'Lee', email: 'lee@bele.ai, syeddyaseenn@gmail.com' },
+        ],
+      };
+
+      const emails = service.extractStoreEmails(mockStore);
+      expect(emails).toEqual(['syeddyaseenn@gmail.com', 'lee@bele.ai']);
+    });
+
+    it('should include store-level email fields if present', () => {
+      const mockStore: any = {
+        storeName: 'Traralgon',
+        email: 'store@misterminit.com.au',
+        staffContacts: [
+          { name: 'Lee', email: 'lee@bele.ai' },
+        ],
+      };
+
+      const emails = service.extractStoreEmails(mockStore);
+      expect(emails).toEqual(['lee@bele.ai', 'store@misterminit.com.au']);
+    });
+
+    it('should fallback to default notification email if store has no emails', () => {
+      const mockStore: any = {
+        storeName: 'Empty Store',
+        staffContacts: [],
+      };
+
+      const emails = service.extractStoreEmails(mockStore);
+      expect(emails).toEqual(['default@neximet.com']);
+    });
+  });
 });

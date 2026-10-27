@@ -385,11 +385,32 @@ export class MissedCallSmsService {
     }
 
     const threadId = (recentThread as any)._id.toString();
-    const storeId = recentThread.storeId.toString();
-    const store = await this.storeConfigService.getStoreByDid(recentThread.did);
+    const storeId = (recentThread.storeId || '').toString();
+    let store = await this.storeConfigService.getStoreByDid(recentThread.did);
+    if (!store && storeId) {
+      store = await this.storeConfigService.getStoreById(storeId);
+    }
 
     // ── Step 4: Mark customer replied ──────────────────────────────────────
     await this.smsThreadsService.setCustomerReplied(threadId);
+
+    // ── Step 4b: Fast path — plain affirmative reply to the callback offer ─
+    // e.g. "yes", "yeah", "sure", "please do", "ok". The LLM still handles every
+    // other phrasing (and anything mixed with a question) below.
+    if (
+      this.isCallbackOfferPending(recentThread.conversationHistory) &&
+      this.isAffirmativeReply(body)
+    ) {
+      return this.processCallbackRequest({
+        from,
+        body,
+        threadId,
+        storeId,
+        store,
+        replyText: null,
+        source: 'affirmative_fast_path',
+      });
+    }
 
     // ── Step 5: Pass to chatbot ────────────────────────────────────────────
     const chatbotResponse = await this.chatbotService.handleMessage({
@@ -433,6 +454,20 @@ export class MissedCallSmsService {
         metadata: { source: 'llm_detected' },
       });
       return { ...chatbotResponse, threadId };
+    }
+
+    // Customer asked for a human callback (any affirmative wording / explicit request)
+    if (chatbotResponse.humanCallbackRequested) {
+      return this.processCallbackRequest({
+        from,
+        body,
+        threadId,
+        storeId,
+        store,
+        replyText: chatbotResponse.replyText,
+        source: 'llm_detected',
+        chatbotResponse,
+      });
     }
 
     // Customer has visited — send thank you reply, append to history, then close thread
@@ -487,33 +522,21 @@ export class MissedCallSmsService {
       // Notify each staff contact via SMS & Email (always)
       // If this is also an emergency escalation, mark it URGENT in subject/body
       const isUrgent = chatbotResponse.emergencyEscalation === true;
-      let staffEmails = (store?.staffContacts || [])
-        .filter((c) => c.email && c.email.trim() !== '')
-        .map((c) => c.email as string);
-
-      // Fallback: If store staff contact has no email configured, use SMTP_USER or DEFAULT_NOTIFICATION_EMAIL
-      if (staffEmails.length === 0) {
-        const fallbackEmail =
-          this.configService.get<string>('DEFAULT_NOTIFICATION_EMAIL') ||
-          this.configService.get<string>('SMTP_USER');
-        if (fallbackEmail) {
-          staffEmails = [fallbackEmail];
-          this.logger.log(
-            `No staff email configured for store "${store?.storeName}". Using fallback notification email: ${fallbackEmail}`,
-          );
-        }
-      }
+      const staffEmails = this.extractStoreEmails(store);
+      this.logger.log(
+        `[BOOKING REQUEST] Notifying store staff for "${this.formatStoreDisplayName(store)}" at emails: [${staffEmails.join(', ')}]`,
+      );
 
       const emailSubject = isUrgent
-        ? `⚠️ URGENT — New Booking Request — Mister Minit ${store?.storeName || ''}`
-        : `New Booking Request — Mister Minit ${store?.storeName || ''}`;
+        ? `⚠️ URGENT — New Booking Request — ${this.formatStoreDisplayName(store)}`
+        : `New Booking Request — ${this.formatStoreDisplayName(store)}`;
 
       const urgentNote = isUrgent
         ? `🚨 URGENT: Customer confirmed an emergency situation — contact immediately.\n\n`
         : '';
 
       const emailBody =
-        `${urgentNote}New booking request — Mister Minit ${store?.storeName || ''}\n` +
+        `${urgentNote}New booking request — ${this.formatStoreDisplayName(store)}\n` +
         `Customer: ${bd.customerName ?? 'Not provided'}\n` +
         `Mobile: ${from}\n` +
         `Service: ${bd.serviceType}\n` +
@@ -584,17 +607,33 @@ export class MissedCallSmsService {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // PART 3 — FOLLOW-UP SCHEDULER (runs every hour)
+  // PART 3 — FOLLOW-UP SCHEDULER (runs every minute)
   // ══════════════════════════════════════════════════════════════════════════
 
-  @Cron(CronExpression.EVERY_HOUR)
+  private followUpRunning = false;
+
+  // Runs every minute: follow-up 15 min after the opening SMS, auto-close
+  // 45 min after the follow-up (see sms-threads.service constants).
+  @Cron(CronExpression.EVERY_MINUTE)
   async runFollowUpScheduler(): Promise<void> {
-    this.logger.log('Follow-up scheduler tick');
+    if (this.followUpRunning) return; // never overlap ticks (avoids double sends)
+    this.followUpRunning = true;
+    try {
+      await this.processFollowUpsAndClosures();
+    } finally {
+      this.followUpRunning = false;
+    }
+  }
+
+  private async processFollowUpsAndClosures(): Promise<void> {
+    this.logger.debug('Follow-up scheduler tick');
 
     // ── Step 1: Send follow-ups ────────────────────────────────────────────
     const followUpThreads =
       await this.smsThreadsService.findThreadsForFollowUp();
-    this.logger.log(`Follow-up candidates: ${followUpThreads.length}`);
+    if (followUpThreads.length) {
+      this.logger.log(`Follow-up candidates: ${followUpThreads.length}`);
+    }
 
     for (const thread of followUpThreads) {
       const threadId = (thread as any)._id.toString();
@@ -619,11 +658,25 @@ export class MissedCallSmsService {
           continue;
         }
 
-        const store = await this.storeConfigService.getStoreByDid(thread.did);
+        let store = await this.storeConfigService.getStoreByDid(thread.did);
+        if (!store && thread.storeId) {
+          store = await this.storeConfigService.getStoreById(
+            thread.storeId.toString(),
+          );
+        }
         if (!store) continue; // skip if store not found
 
         const body = this.buildFollowUpSms(store);
-        await this.sendWithRetry(thread.callerNumber, body, MAX_SMS_RETRIES);
+        const sent = await this.sendWithRetry(
+          thread.callerNumber,
+          body,
+          MAX_SMS_RETRIES,
+        );
+        if (!sent) {
+          // Not marked as sent: retried next tick while within the safety window
+          this.logger.warn(`Follow-up SMS failed for thread ${threadId}`);
+          continue;
+        }
         await this.smsThreadsService.setFollowUpSent(threadId);
         await this.smsThreadsService.appendToHistory(threadId, {
           role: 'assistant',
@@ -648,7 +701,9 @@ export class MissedCallSmsService {
 
     // ── Step 2: Close ghosted threads ─────────────────────────────────────
     const threadsToClose = await this.smsThreadsService.findThreadsToClose();
-    this.logger.log(`Threads to auto-close: ${threadsToClose.length}`);
+    if (threadsToClose.length) {
+      this.logger.log(`Threads to auto-close: ${threadsToClose.length}`);
+    }
 
     for (const thread of threadsToClose) {
       const threadId = (thread as any)._id.toString();
@@ -677,6 +732,139 @@ export class MissedCallSmsService {
   // ══════════════════════════════════════════════════════════════════════════
   // PRIVATE HELPERS
   // ══════════════════════════════════════════════════════════════════════════
+
+  /** True when the latest assistant message offered a human callback. */
+  public isCallbackOfferPending(
+    history: Array<{ role: string; content: string }> | undefined,
+  ): boolean {
+    if (!history?.length) return false;
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i].role === 'assistant') {
+        return /call you back/i.test(history[i].content || '');
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Conservative detector for a *plain* affirmative ("yes", "yeah", "sure",
+   * "please do", "ok", thumbs-up...). Every word must be affirmative vocabulary
+   * and at least one must be a strong yes — anything else (questions, "no",
+   * mixed content) is left to the LLM.
+   */
+  public isAffirmativeReply(body: string): boolean {
+    const raw = (body || '').trim();
+    if (!raw) return false;
+    if (/^[\u{1F44D}\u{1F44C}\u2705\u{1F64F}\s]+$/u.test(raw)) return true;
+
+    const tokens = raw
+      .toLowerCase()
+      .replace(/[^a-z\s]/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+    if (tokens.length === 0 || tokens.length > 6) return false;
+
+    const strong = new Set([
+      'yes', 'yess', 'yesss', 'yeah', 'yea', 'yep', 'yup', 'yah', 'ya', 'y',
+      'sure', 'ok', 'okay', 'okey', 'please', 'pls', 'plz', 'definitely',
+      'absolutely', 'ahead', 'sounds', 'call', 'ring', 'works', 'course',
+    ]);
+    const filler = new Set([
+      'thanks', 'thank', 'you', 'thx', 'ty', 'of', 'go', 'good', 'great',
+      'that', 'would', 'be', 'it', 'do', 'me', 'back', 'can', 'u', 'now',
+      'a', 'to', 'fine', 'yeah', 'for', 'sure', 'like', 'i',
+    ]);
+    if (!tokens.every((t) => strong.has(t) || filler.has(t))) return false;
+    return tokens.some((t) => strong.has(t));
+  }
+
+  /**
+   * Customer wants a human: confirm to them, flag the thread and notify store
+   * staff by SMS + email. The thread stays open so the conversation can continue.
+   */
+  private async processCallbackRequest(params: {
+    from: string;
+    body: string;
+    threadId: string;
+    storeId: string;
+    store: StoreConfig | null;
+    replyText: string | null;
+    source: string;
+    chatbotResponse?: any;
+  }): Promise<any> {
+    const { from, body, threadId, storeId, store, source } = params;
+    const storeName = store?.storeName ?? '';
+
+    // Use the LLM wording only when it clearly confirms a call back
+    // (e.g. it also answered a question); otherwise the fixed confirmation.
+    const llmReply = (params.replyText || '').trim();
+    const replyText =
+      llmReply && /call/i.test(llmReply)
+        ? llmReply
+        : this.buildCallbackConfirmation(store);
+
+    await this.smsThreadsService.setCallbackRequested(threadId);
+    await this.sendWithRetry(from, replyText, MAX_SMS_RETRIES);
+    await this.smsThreadsService.appendToHistory(threadId, {
+      role: 'user',
+      content: body,
+      sentAt: new Date(),
+    });
+    await this.smsThreadsService.appendToHistory(threadId, {
+      role: 'assistant',
+      content: replyText,
+      sentAt: new Date(),
+    });
+    await this.smsThreadsService.incrementMessageCount(threadId);
+
+    // Notify store staff (SMS + email)
+    const staffMessage = this.buildCallbackStaffNotification(store, from);
+    const staffEmails = this.extractStoreEmails(store);
+    this.logger.log(
+      `[CALLBACK REQUEST] Notifying store staff for "${this.formatStoreDisplayName(store)}" at emails: [${staffEmails.join(', ')}]`,
+    );
+    try {
+      if (staffEmails.length > 0) {
+        await this.mailService.sendEmail(
+          staffEmails,
+          `Callback Request — ${this.formatStoreDisplayName(store)}`,
+          staffMessage,
+        );
+      }
+      for (const contact of store?.staffContacts || []) {
+        if (contact.mobile) {
+          await this.smsProviderService.sendSms(contact.mobile, staffMessage);
+        }
+      }
+    } catch (err: any) {
+      this.logger.error(
+        `Failed to notify staff of callback request for thread ${threadId}: ${err.message}`,
+        err.stack,
+      );
+    }
+
+    await this.loggingService.log(LogEventType.CALLBACK_REQUESTED, {
+      callerNumber: from,
+      storeId,
+      storeName,
+      threadId,
+      metadata: { inboundBody: body, source },
+    });
+    await this.loggingService.log(LogEventType.STAFF_NOTIFIED, {
+      callerNumber: from,
+      storeId,
+      storeName,
+      threadId,
+      metadata: { reason: 'callback_requested' },
+    });
+
+    return {
+      ...(params.chatbotResponse || {}),
+      replyText,
+      humanCallbackRequested: true,
+      threadId,
+    };
+  }
 
   private parseDurationToSeconds(duration: string): number {
     if (!duration || !duration.trim()) return 0;
@@ -767,25 +955,102 @@ export class MissedCallSmsService {
 
   // ── SMS templates ──────────────────────────────────────────────────────────
 
+  /**
+   * Extracts and normalizes all notification emails attached to the store:
+   * 1. All staff contact emails on store.staffContacts
+   * 2. Store-level email/emails/notificationEmail fields if present
+   * 3. Fallback to DEFAULT_NOTIFICATION_EMAIL or SMTP_USER if none configured on store
+   */
+  public extractStoreEmails(store: StoreConfig | null): string[] {
+    const emails = new Set<string>();
+
+    const addEmail = (raw: any) => {
+      if (!raw || typeof raw !== 'string') return;
+      const parts = raw.split(/[,;\s]+/);
+      for (const part of parts) {
+        const trimmed = part.trim().toLowerCase();
+        if (trimmed && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+          emails.add(trimmed);
+        }
+      }
+    };
+
+    // 1. All staffContacts attached to the store
+    if (store?.staffContacts && Array.isArray(store.staffContacts)) {
+      for (const contact of store.staffContacts) {
+        if (contact?.email) {
+          addEmail(contact.email);
+        }
+      }
+    }
+
+    // 2. Store-level email fields if present
+    const storeAny = store as any;
+    if (storeAny) {
+      if (storeAny.email) addEmail(storeAny.email);
+      if (storeAny.notificationEmail) addEmail(storeAny.notificationEmail);
+      if (storeAny.storeEmail) addEmail(storeAny.storeEmail);
+      if (Array.isArray(storeAny.emails)) {
+        storeAny.emails.forEach(addEmail);
+      }
+    }
+
+    // 3. Fallback if store has no emails configured
+    if (emails.size === 0) {
+      const fallbackEmail =
+        this.configService.get<string>('DEFAULT_NOTIFICATION_EMAIL') ||
+        this.configService.get<string>('SMTP_USER');
+      if (fallbackEmail) addEmail(fallbackEmail);
+    }
+
+    return Array.from(emails);
+  }
+
+  public formatStoreDisplayName(store: StoreConfig | null): string {
+    const raw = store?.storeName?.trim();
+    if (!raw) return 'Mister Minit';
+    if (/^mister\s+minit/i.test(raw)) return raw;
+    return `Mister Minit ${raw}`;
+  }
+
   public buildOpeningSms(store: StoreConfig): string {
+    const displayName = this.formatStoreDisplayName(store);
     return [
-      `Hi, sorry we missed your call to Mister Minit ${store.storeName}! How can we help you today?`,
+      `Hi, sorry we missed your call to ${displayName}! How can we help you today?`,
       ``,
       `Website: https://misterminit.co`,
       `Reply STOP to opt out.`,
     ].join('\n');
   }
 
-  private buildFollowUpSms(store: StoreConfig | null): string {
-    if (!store)
-      return 'Hi, just checking in from Mister Minit — did you make it into the store?';
+  public buildFollowUpSms(store: StoreConfig | null): string {
+    const displayName = this.formatStoreDisplayName(store);
+    return [
+      `Hi, just checking in from ${displayName}! Did you still need help? I'm our smart virtual assistant and can answer anything about our services or pricing.`,
+      ``,
+      `Would you like one of our store team members to call you back instead? Reply YES`,
+      ``,
+      `Reply STOP to opt out.`,
+    ].join('\n');
+  }
+
+  public buildCallbackConfirmation(store: StoreConfig | null): string {
+    const displayName = this.formatStoreDisplayName(store);
     return (
-      `Hi, just checking in from Mister Minit ${store.storeName} — ` +
-      `did you make it into the store, or is there anything ` +
-      `else we can help with?\n` +
-      `Hours: ${store.tradingHours}. ` +
-      `Find us: ${store.googleMapsLink}\n` +
-      `Reply STOP to opt out.`
+      `Thanks! I've notified the team at ${displayName} — you'll receive a call back soon. ` +
+      `In the meantime, feel free to message me if you have any questions.`
+    );
+  }
+
+  public buildCallbackStaffNotification(
+    store: StoreConfig | null,
+    callerNumber: string,
+  ): string {
+    const displayName = this.formatStoreDisplayName(store);
+    return (
+      `Callback request — ${displayName}\n` +
+      `Customer mobile: ${callerNumber}\n` +
+      `The customer missed our call and asked for a team member to call them back. Please call them as soon as possible.`
     );
   }
 
@@ -797,11 +1062,11 @@ export class MissedCallSmsService {
   }
 
   private buildBookingConfirmation(store: StoreConfig | null, bd: any): string {
-    const name = store?.storeName ?? 'Mister Minit';
+    const displayName = this.formatStoreDisplayName(store);
     const maps = store?.googleMapsLink ?? '';
     return (
-      `Thanks — we've let Mister Minit ${name} know you'd like to come in ${bd.preferredTime} for ${bd.serviceType}. ` +
-      `Head there at that time and the team will take care of you. ${maps}`
+      `Thanks — we've let ${displayName} know you'd like to come in ${bd.preferredTime} for ${bd.serviceType}. ` +
+      `Head there at that time and the team will take care of you. ${maps}`.trim()
     );
   }
 
