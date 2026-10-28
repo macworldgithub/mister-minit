@@ -122,6 +122,7 @@ Thumbs.db
 *.xls
 *.csv
 client_reports/
+neww/
 
 # Generated Audit Reports & Temporary Artifacts
 *.pdf
