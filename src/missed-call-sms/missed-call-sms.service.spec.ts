@@ -231,7 +231,7 @@ describe('MissedCallSmsService - buildOpeningSms', () => {
         "Hi, just checking in from Mister Minit Marion! Did you still need help? I'm our smart virtual assistant and can answer anything about our services or pricing.",
       );
       expect(followUp).toContain(
-        'Would you like one of our store team members to call you back instead? Reply YES',
+        'Would you like one of our store team members to call you back? Reply Y or N',
       );
       expect(followUp).toContain('Reply STOP to opt out.');
 

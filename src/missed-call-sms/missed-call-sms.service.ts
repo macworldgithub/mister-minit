@@ -818,6 +818,8 @@ export class MissedCallSmsService {
     await this.smsThreadsService.incrementMessageCount(threadId);
 
     // Notify store staff (SMS + email)
+    const emailSubject = `Callback Request — ${this.formatStoreDisplayName(store)} (${from})`;
+    const emailBody = this.buildCallbackEmailNotification(store, from, body);
     const staffMessage = this.buildCallbackStaffNotification(store, from);
     const staffEmails = this.extractStoreEmails(store);
     this.logger.log(
@@ -827,8 +829,8 @@ export class MissedCallSmsService {
       if (staffEmails.length > 0) {
         await this.mailService.sendEmail(
           staffEmails,
-          `Callback Request — ${this.formatStoreDisplayName(store)}`,
-          staffMessage,
+          emailSubject,
+          emailBody,
         );
       }
       for (const contact of store?.staffContacts || []) {
@@ -1028,7 +1030,7 @@ export class MissedCallSmsService {
     return [
       `Hi, just checking in from ${displayName}! Did you still need help? I'm our smart virtual assistant and can answer anything about our services or pricing.`,
       ``,
-      `Would you like one of our store team members to call you back instead? Reply YES`,
+      `Would you like one of our store team members to call you back? Reply Y or N`,
       ``,
       `Reply STOP to opt out.`,
     ].join('\n');
@@ -1052,6 +1054,53 @@ export class MissedCallSmsService {
       `Customer mobile: ${callerNumber}\n` +
       `The customer missed our call and asked for a team member to call them back. Please call them as soon as possible.`
     );
+  }
+
+  public buildCallbackEmailNotification(
+    store: StoreConfig | null,
+    callerNumber: string,
+    customerReply?: string,
+  ): string {
+    const displayName = this.formatStoreDisplayName(store);
+    const did = store?.did ? store.did : 'N/A';
+    const address = store?.address ? store.address : 'Not specified';
+    const replyNote = customerReply ? `"${customerReply}"` : 'Affirmative callback request (YES)';
+    const timestamp = new Date().toLocaleString('en-AU', {
+      timeZone: 'Australia/Sydney',
+      dateStyle: 'full',
+      timeStyle: 'short',
+    });
+
+    return [
+      `==================================================`,
+      `MISTER MINIT — CUSTOMER CALLBACK REQUEST`,
+      `==================================================`,
+      ``,
+      `Hello Customer Service Team,`,
+      ``,
+      `A customer who missed a call from one of our stores has requested a phone callback via our automated SMS concierge.`,
+      ``,
+      `--------------------------------------------------`,
+      `CUSTOMER DETAILS`,
+      `--------------------------------------------------`,
+      `• Customer Mobile:   ${callerNumber}`,
+      `• Customer Response: ${replyNote}`,
+      `• Time Received:     ${timestamp} (AEDT)`,
+      ``,
+      `--------------------------------------------------`,
+      `STORE DETAILS`,
+      `--------------------------------------------------`,
+      `• Store Called:      ${displayName}`,
+      `• Store Direct DID:  ${did}`,
+      `• Store Address:     ${address}`,
+      ``,
+      `--------------------------------------------------`,
+      `ACTION REQUIRED`,
+      `--------------------------------------------------`,
+      `Please call the customer back on ${callerNumber} as soon as possible to assist with their inquiry.`,
+      ``,
+      `Mister Minit Automated Virtual Concierge System`,
+    ].join('\n');
   }
 
   private buildOptOutConfirmation(): string {
