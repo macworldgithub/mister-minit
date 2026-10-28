@@ -1,6 +1,16 @@
-import { Controller, Get, Param, Query, NotFoundException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery, ApiParam } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Param,
+  Query,
+  Body,
+  NotFoundException,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiQuery, ApiParam, ApiBody } from '@nestjs/swagger';
 import { SmsThreadsService } from './sms-threads.service';
+import { ThreadStatus } from './sms-thread.schema';
 
 @ApiTags('SMS Concierge & Threads')
 @Controller('sms-threads')
@@ -127,5 +137,80 @@ export class SmsThreadsController {
       limit: limit ? parseInt(limit, 10) : 50,
       skip: skip ? parseInt(skip, 10) : 0,
     });
+  }
+
+  @Patch(':id/status')
+  @ApiOperation({
+    summary: 'Update SMS thread status',
+    description:
+      'Updates thread status (e.g. closed_visited, closed_answered, closed_no_response, active).',
+  })
+  @ApiParam({ name: 'id', description: 'SMS Thread ID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', example: 'closed_visited' },
+        closedReason: { type: 'string', example: 'closed_visited' },
+      },
+      required: ['status'],
+    },
+  })
+  async updateThreadStatus(
+    @Param('id') id: string,
+    @Body() body: { status: ThreadStatus | string; closedReason?: string },
+  ) {
+    const thread = await this.smsThreadsService.findThreadById(id);
+    if (!thread) {
+      throw new NotFoundException(`SMS Thread with ID "${id}" not found`);
+    }
+
+    const isClosed = String(body.status).startsWith('closed_');
+    if (isClosed) {
+      await this.smsThreadsService.closeThread(
+        id,
+        body.closedReason || body.status,
+      );
+    } else {
+      await this.smsThreadsService.updateStatus(id, body.status as ThreadStatus);
+    }
+
+    return this.smsThreadsService.findThreadById(id);
+  }
+
+  @Post(':id/messages')
+  @ApiOperation({
+    summary: 'Append a message to SMS thread conversation history',
+    description: 'Manually appends an assistant or user message entry to thread conversation history.',
+  })
+  @ApiParam({ name: 'id', description: 'SMS Thread ID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        content: { type: 'string' },
+        role: { type: 'string', enum: ['assistant', 'user'], default: 'assistant' },
+      },
+      required: ['content'],
+    },
+  })
+  async appendMessage(
+    @Param('id') id: string,
+    @Body() body: { content: string; role?: 'user' | 'assistant' },
+  ) {
+    const thread = await this.smsThreadsService.findThreadById(id);
+    if (!thread) {
+      throw new NotFoundException(`SMS Thread with ID "${id}" not found`);
+    }
+
+    const role = body.role || 'assistant';
+    await this.smsThreadsService.appendToHistory(id, {
+      role,
+      content: body.content,
+      sentAt: new Date(),
+    });
+    await this.smsThreadsService.incrementMessageCount(id);
+
+    return this.smsThreadsService.findThreadById(id);
   }
 }
