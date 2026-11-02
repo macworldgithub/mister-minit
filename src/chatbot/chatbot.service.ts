@@ -892,13 +892,16 @@ export class ChatbotService {
     this.logger.debug(`Calling LLM with ${history.length} messages in history`);
 
     const client = this.getOpenAIClient();
-    const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: history,
-      max_tokens: 500,
-      temperature: 0.5,
-      response_format: { type: 'json_object' },
-    });
+    const response = await client.chat.completions.create(
+      {
+        model: 'gpt-4o-mini',
+        messages: history,
+        max_tokens: 500,
+        temperature: 0.5,
+        response_format: { type: 'json_object' },
+      },
+      { timeout: 15000 },
+    );
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
@@ -986,8 +989,11 @@ export class ChatbotService {
     } catch (err: any) {
       this.logger.error(`[OpenAI GPT] Call failed for ${callerNumber}: ${err.message}`, err.stack);
       const did = storeRecord?.did ?? '';
+      const fallbackMsg = did
+        ? `Sorry, something went wrong. Please call us directly on ${did}.`
+        : `Sorry, something went wrong. Please call our store directly.`;
       return {
-        replyText: `Sorry, something went wrong. Please call us directly on ${did}.`,
+        replyText: fallbackMsg,
         optOut: false,
         bookingIntentDetected: false,
         emergencyEscalation: false,
@@ -1040,8 +1046,11 @@ export class ChatbotService {
         e.stack,
       );
       // JSON parse failed — return safe fallback
+      const fallbackMsg = storeDid
+        ? `Sorry, something went wrong. Please call us directly on ${storeDid}.`
+        : `Sorry, something went wrong. Please call our store directly.`;
       return {
-        replyText: `Sorry, something went wrong. Please call us directly on ${storeDid}.`,
+        replyText: fallbackMsg,
         optOut: false,
         bookingIntentDetected: false,
         emergencyEscalation: false,

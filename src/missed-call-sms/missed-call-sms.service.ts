@@ -391,7 +391,12 @@ export class MissedCallSmsService {
       store = await this.storeConfigService.getStoreById(storeId);
     }
 
-    // ── Step 4: Mark customer replied ──────────────────────────────────────
+    // ── Step 4: Record user message & mark customer replied ─────────────────
+    await this.smsThreadsService.appendToHistory(threadId, {
+      role: 'user',
+      content: body,
+      sentAt: new Date(),
+    });
     await this.smsThreadsService.setCustomerReplied(threadId);
 
     // ── Step 4b: Fast path — plain affirmative reply to the callback offer ─
@@ -412,198 +417,232 @@ export class MissedCallSmsService {
       });
     }
 
-    // ── Step 5: Pass to chatbot ────────────────────────────────────────────
-    const chatbotResponse = await this.chatbotService.handleMessage({
-      callerNumber: from,
-      storeRecord: store,
-      conversationHistory: recentThread.conversationHistory,
-      newInboundMessage: body,
-      messageCount: recentThread.messageCount,
-      missedCallId: (recentThread as any)._id,
-    });
-
-    // ── Step 6: Handle chatbot response ───────────────────────────────────
-    const storeName = store?.storeName ?? '';
-
-    this.logger.log(
-      `[CHATBOT ASSISTANT] Generated reply for ${from}: "${chatbotResponse.replyText}" (BookingDetected=${chatbotResponse.bookingIntentDetected}, OptOut=${chatbotResponse.optOut})`,
-    );
-
-    // LLM-detected opt-out
-    if (chatbotResponse.optOut) {
-      await this.optOutService.addOptOut({
+    try {
+      // ── Step 5: Pass to chatbot ────────────────────────────────────────────
+      const chatbotResponse = await this.chatbotService.handleMessage({
         callerNumber: from,
-        keyword: body,
-        source: 'llm_detected',
-        threadId,
+        storeRecord: store,
+        conversationHistory: recentThread.conversationHistory,
+        newInboundMessage: body,
+        messageCount: recentThread.messageCount,
+        missedCallId: (recentThread as any)._id,
       });
-      await this.sendWithRetry(
-        from,
-        this.buildOptOutConfirmation(),
-        MAX_SMS_RETRIES,
-      );
-      await this.smsThreadsService.closeThread(
-        threadId,
-        ThreadStatus.CLOSED_OPTED_OUT,
-      );
-      await this.loggingService.log(LogEventType.OPT_OUT_RECEIVED, {
-        callerNumber: from,
-        storeId,
-        storeName,
-        threadId,
-        metadata: { source: 'llm_detected' },
-      });
-      return { ...chatbotResponse, threadId };
-    }
 
-    // Customer asked for a human callback (any affirmative wording / explicit request)
-    if (chatbotResponse.humanCallbackRequested) {
-      return this.processCallbackRequest({
-        from,
-        body,
-        threadId,
-        storeId,
-        store,
-        replyText: chatbotResponse.replyText,
-        source: 'llm_detected',
-        chatbotResponse,
-      });
-    }
+      // ── Step 6: Handle chatbot response ───────────────────────────────────
+      const storeName = store?.storeName ?? '';
 
-    // Customer has visited — send thank you reply, append to history, then close thread
-    if (
-      chatbotResponse.threadShouldClose &&
-      chatbotResponse.closeReason === ThreadStatus.CLOSED_VISITED
-    ) {
+      this.logger.log(
+        `[CHATBOT ASSISTANT] Generated reply for ${from}: "${chatbotResponse.replyText}" (BookingDetected=${chatbotResponse.bookingIntentDetected}, OptOut=${chatbotResponse.optOut})`,
+      );
+
+      // LLM-detected opt-out
+      if (chatbotResponse.optOut) {
+        await this.optOutService.addOptOut({
+          callerNumber: from,
+          keyword: body,
+          source: 'llm_detected',
+          threadId,
+        });
+        await this.sendWithRetry(
+          from,
+          this.buildOptOutConfirmation(),
+          MAX_SMS_RETRIES,
+        );
+        await this.smsThreadsService.closeThread(
+          threadId,
+          ThreadStatus.CLOSED_OPTED_OUT,
+        );
+        await this.loggingService.log(LogEventType.OPT_OUT_RECEIVED, {
+          callerNumber: from,
+          storeId,
+          storeName,
+          threadId,
+          metadata: { source: 'llm_detected' },
+        });
+        return { ...chatbotResponse, threadId };
+      }
+
+      // Customer asked for a human callback (any affirmative wording / explicit request)
+      if (chatbotResponse.humanCallbackRequested) {
+        return this.processCallbackRequest({
+          from,
+          body,
+          threadId,
+          storeId,
+          store,
+          replyText: chatbotResponse.replyText,
+          source: 'llm_detected',
+          chatbotResponse,
+        });
+      }
+
+      // Customer has visited — send thank you reply, append to history, then close thread
+      if (
+        chatbotResponse.threadShouldClose &&
+        chatbotResponse.closeReason === ThreadStatus.CLOSED_VISITED
+      ) {
+        if (chatbotResponse.replyText) {
+          await this.sendWithRetry(
+            from,
+            chatbotResponse.replyText,
+            MAX_SMS_RETRIES,
+          );
+          await this.smsThreadsService.appendToHistory(threadId, {
+            role: 'assistant',
+            content: chatbotResponse.replyText,
+            sentAt: new Date(),
+          });
+        }
+
+        await this.smsThreadsService.closeThread(
+          threadId,
+          ThreadStatus.CLOSED_VISITED,
+        );
+        await this.loggingService.log(LogEventType.THREAD_CLOSED, {
+          callerNumber: from,
+          storeId,
+          storeName,
+          threadId,
+          metadata: { closeReason: ThreadStatus.CLOSED_VISITED },
+        });
+        return { ...chatbotResponse, threadId };
+      }
+
+      // Booking captured
+      if (
+        chatbotResponse.bookingIntentDetected &&
+        chatbotResponse.bookingDetails
+      ) {
+        const bd = chatbotResponse.bookingDetails;
+        await this.smsThreadsService.saveBooking(threadId, bd);
+
+        // Confirm to customer
+        const confirmBody = this.buildBookingConfirmation(store, bd);
+        await this.sendWithRetry(from, confirmBody, MAX_SMS_RETRIES);
+
+        await this.smsThreadsService.appendToHistory(threadId, {
+          role: 'assistant',
+          content: confirmBody,
+          sentAt: new Date(),
+        });
+        await this.smsThreadsService.incrementMessageCount(threadId);
+
+        // Notify each staff contact via SMS & Email (always)
+        // If this is also an emergency escalation, mark it URGENT in subject/body
+        const isUrgent = chatbotResponse.emergencyEscalation === true;
+        const staffEmails = this.extractStoreEmails(store);
+        this.logger.log(
+          `[BOOKING REQUEST] Notifying store staff for "${this.formatStoreDisplayName(store)}" at emails: [${staffEmails.join(', ')}]`,
+        );
+
+        const emailSubject = isUrgent
+          ? `⚠️ URGENT — New Booking Request — ${this.formatStoreDisplayName(store)}`
+          : `New Booking Request — ${this.formatStoreDisplayName(store)}`;
+
+        const urgentNote = isUrgent
+          ? `🚨 URGENT: Customer confirmed an emergency situation — contact immediately.\n\n`
+          : '';
+
+        const emailBody =
+          `${urgentNote}New booking request — ${this.formatStoreDisplayName(store)}\n` +
+          `Customer: ${bd.customerName ?? 'Not provided'}\n` +
+          `Mobile: ${from}\n` +
+          `Service: ${bd.serviceType}\n` +
+          `Preferred time: ${bd.preferredTime}`;
+
+        if (staffEmails.length > 0) {
+          await this.mailService.sendEmail(staffEmails, emailSubject, emailBody);
+        }
+
+        if (store?.staffContacts?.length) {
+          store.staffContacts.forEach((contact) => {
+            if (contact.mobile) {
+              this.smsProviderService.sendSms(contact.mobile, emailBody);
+            }
+          });
+        }
+
+        await this.loggingService.log(LogEventType.BOOKING_CAPTURED, {
+          callerNumber: from,
+          storeId,
+          storeName,
+          threadId,
+          metadata: {
+            bookingDetails: bd,
+            emergencyEscalation: chatbotResponse.emergencyEscalation,
+          },
+        });
+        await this.loggingService.log(LogEventType.STAFF_NOTIFIED, {
+          callerNumber: from,
+          storeId,
+          storeName,
+          threadId,
+        });
+        return { ...chatbotResponse, threadId };
+      }
+
+      // Normal reply
       if (chatbotResponse.replyText) {
         await this.sendWithRetry(
           from,
           chatbotResponse.replyText,
           MAX_SMS_RETRIES,
         );
-        await this.smsThreadsService.appendToHistory(threadId, {
-          role: 'user',
-          content: body,
-          sentAt: new Date(),
-        });
+
         await this.smsThreadsService.appendToHistory(threadId, {
           role: 'assistant',
           content: chatbotResponse.replyText,
           sentAt: new Date(),
         });
-      }
 
-      await this.smsThreadsService.closeThread(
-        threadId,
-        ThreadStatus.CLOSED_VISITED,
-      );
-      await this.loggingService.log(LogEventType.THREAD_CLOSED, {
-        callerNumber: from,
-        storeId,
-        storeName,
-        threadId,
-        metadata: { closeReason: ThreadStatus.CLOSED_VISITED },
-      });
-      return { ...chatbotResponse, threadId };
-    }
+        await this.smsThreadsService.incrementMessageCount(threadId);
 
-    // Booking captured
-    if (
-      chatbotResponse.bookingIntentDetected &&
-      chatbotResponse.bookingDetails
-    ) {
-      const bd = chatbotResponse.bookingDetails;
-      await this.smsThreadsService.saveBooking(threadId, bd);
-
-      // Confirm to customer
-      const confirmBody = this.buildBookingConfirmation(store, bd);
-      await this.sendWithRetry(from, confirmBody, MAX_SMS_RETRIES);
-
-      // Notify each staff contact via SMS & Email (always)
-      // If this is also an emergency escalation, mark it URGENT in subject/body
-      const isUrgent = chatbotResponse.emergencyEscalation === true;
-      const staffEmails = this.extractStoreEmails(store);
-      this.logger.log(
-        `[BOOKING REQUEST] Notifying store staff for "${this.formatStoreDisplayName(store)}" at emails: [${staffEmails.join(', ')}]`,
-      );
-
-      const emailSubject = isUrgent
-        ? `⚠️ URGENT — New Booking Request — ${this.formatStoreDisplayName(store)}`
-        : `New Booking Request — ${this.formatStoreDisplayName(store)}`;
-
-      const urgentNote = isUrgent
-        ? `🚨 URGENT: Customer confirmed an emergency situation — contact immediately.\n\n`
-        : '';
-
-      const emailBody =
-        `${urgentNote}New booking request — ${this.formatStoreDisplayName(store)}\n` +
-        `Customer: ${bd.customerName ?? 'Not provided'}\n` +
-        `Mobile: ${from}\n` +
-        `Service: ${bd.serviceType}\n` +
-        `Preferred time: ${bd.preferredTime}`;
-
-      if (staffEmails.length > 0) {
-        await this.mailService.sendEmail(staffEmails, emailSubject, emailBody);
-      }
-
-      if (store?.staffContacts?.length) {
-        store.staffContacts.forEach((contact) => {
-          if (contact.mobile) {
-            this.smsProviderService.sendSms(contact.mobile, emailBody);
-          }
+        await this.loggingService.log(LogEventType.INBOUND_SMS_RECEIVED, {
+          callerNumber: from,
+          storeId,
+          storeName,
+          threadId,
+          metadata: { inboundBody: body, replyText: chatbotResponse.replyText },
         });
       }
 
-      await this.loggingService.log(LogEventType.BOOKING_CAPTURED, {
-        callerNumber: from,
-        storeId,
-        storeName,
-        threadId,
-        metadata: {
-          bookingDetails: bd,
-          emergencyEscalation: chatbotResponse.emergencyEscalation,
-        },
-      });
-      await this.loggingService.log(LogEventType.STAFF_NOTIFIED, {
-        callerNumber: from,
-        storeId,
-        storeName,
-        threadId,
-      });
       return { ...chatbotResponse, threadId };
-    }
-
-    // Normal reply
-    if (chatbotResponse.replyText) {
-      await this.sendWithRetry(
-        from,
-        chatbotResponse.replyText,
-        MAX_SMS_RETRIES,
+    } catch (err: any) {
+      this.logger.error(
+        `[INBOUND SMS] Error processing chatbot reply for ${from}: ${err.message}`,
+        err.stack,
       );
+      const storeDid = store?.did || recentThread.did || '';
+      const fallbackReply = storeDid
+        ? `Sorry, something went wrong. Please call us directly on ${storeDid}.`
+        : `Sorry, something went wrong. Please call our store directly.`;
 
-      await this.smsThreadsService.appendToHistory(threadId, {
-        role: 'user',
-        content: body,
-        sentAt: new Date(),
-      });
+      await this.sendWithRetry(from, fallbackReply, MAX_SMS_RETRIES);
       await this.smsThreadsService.appendToHistory(threadId, {
         role: 'assistant',
-        content: chatbotResponse.replyText,
+        content: fallbackReply,
         sentAt: new Date(),
       });
-
       await this.smsThreadsService.incrementMessageCount(threadId);
 
       await this.loggingService.log(LogEventType.INBOUND_SMS_RECEIVED, {
         callerNumber: from,
         storeId,
-        storeName,
+        storeName: store?.storeName ?? '',
         threadId,
-        metadata: { inboundBody: body, replyText: chatbotResponse.replyText },
+        metadata: {
+          inboundBody: body,
+          replyText: fallbackReply,
+          error: err.message,
+        },
       });
-    }
 
-    return { ...chatbotResponse, threadId };
+      return {
+        replyText: fallbackReply,
+        threadId,
+        error: err.message,
+      };
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -805,11 +844,6 @@ export class MissedCallSmsService {
 
     await this.smsThreadsService.setCallbackRequested(threadId);
     await this.sendWithRetry(from, replyText, MAX_SMS_RETRIES);
-    await this.smsThreadsService.appendToHistory(threadId, {
-      role: 'user',
-      content: body,
-      sentAt: new Date(),
-    });
     await this.smsThreadsService.appendToHistory(threadId, {
       role: 'assistant',
       content: replyText,
