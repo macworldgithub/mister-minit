@@ -444,16 +444,24 @@ export class SmsThreadsService {
 
     // Date range filter
     if (filter.startDate || filter.endDate) {
-      query.createdAt = {};
+      const dateCond: Record<string, any> = {};
       if (filter.startDate) {
-        query.createdAt.$gte = new Date(filter.startDate);
+        dateCond.$gte = new Date(filter.startDate);
       }
       if (filter.endDate) {
         const end = new Date(filter.endDate);
         if (filter.endDate.length <= 10) {
           end.setUTCHours(23, 59, 59, 999);
         }
-        query.createdAt.$lte = end;
+        dateCond.$lte = end;
+      }
+      const isClosedQuery =
+        filter.status === 'closed' ||
+        (query.status && query.status.$in === CLOSED_STATUSES);
+      if (isClosedQuery) {
+        query.$or = [{ createdAt: dateCond }, { closedAt: dateCond }];
+      } else {
+        query.createdAt = dateCond;
       }
     }
 
