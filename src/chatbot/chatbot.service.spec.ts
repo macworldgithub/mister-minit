@@ -20,4 +20,24 @@ describe('ChatbotService - SYSTEM_PROMPT Rules', () => {
       'You MUST ALWAYS provide BOTH the full address ({{STORE_ADDRESS}}) AND the Google Maps link ({{GOOGLE_MAPS_LINK}}) together in the SAME message.',
     );
   });
+
+  it('should include all 14 2026 public holidays and mandatory closure rule', () => {
+    expect(SYSTEM_PROMPT).toContain('2026 PUBLIC HOLIDAYS — MANDATORY CLOSURE RULE');
+    expect(SYSTEM_PROMPT).toContain('{{CURRENT_DATE}}');
+    expect(SYSTEM_PROMPT).toContain("New Year's Day — 1 January 2026 (Thursday)");
+    expect(SYSTEM_PROMPT).toContain('Australia Day — 26 January 2026 (Monday)');
+    expect(SYSTEM_PROMPT).toContain('Labour Day — 9 March 2026 (Monday)');
+    expect(SYSTEM_PROMPT).toContain('Good Friday — 3 April 2026 (Friday)');
+    expect(SYSTEM_PROMPT).toContain('Saturday before Easter Sunday — 4 April 2026 (Saturday)');
+    expect(SYSTEM_PROMPT).toContain('Easter Sunday — 5 April 2026 (Sunday)');
+    expect(SYSTEM_PROMPT).toContain('Easter Monday — 6 April 2026 (Monday)');
+    expect(SYSTEM_PROMPT).toContain('ANZAC Day — 25 April 2026 (Saturday)');
+    expect(SYSTEM_PROMPT).toContain("King's Birthday — 8 June 2026 (Monday)");
+    expect(SYSTEM_PROMPT).toContain('Friday before AFL Grand Final — 25 September 2026 (Friday)');
+    expect(SYSTEM_PROMPT).toContain('Melbourne Cup Day — 3 November 2026 (Tuesday)');
+    expect(SYSTEM_PROMPT).toContain('Christmas Day — 25 December 2026 (Friday)');
+    expect(SYSTEM_PROMPT).toContain('Boxing Day — 26 December 2026 (Saturday)');
+    expect(SYSTEM_PROMPT).toContain('Additional Boxing Day Public Holiday — 28 December 2026 (Monday)');
+    expect(SYSTEM_PROMPT).toContain('No, we are closed due to [Holiday Name]');
+  });
 });

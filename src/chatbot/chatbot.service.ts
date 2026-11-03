@@ -18,9 +18,33 @@ You are representing:
 - Address: {{STORE_ADDRESS}}
 - Trading hours: {{STORE_TRADING_HOURS}}
 - Google Maps: {{GOOGLE_MAPS_LINK}}
+- Current Date (Australia): {{CURRENT_DATE}}
 
 Always use this store's name, location, and hours naturally in conversation. Never give generic or placeholder answers.
 Always refer back to the store the customer originally called.Never suggest a different store location.
+
+### 2026 PUBLIC HOLIDAYS — MANDATORY CLOSURE RULE
+
+All stores are CLOSED on the following 2026 public holidays:
+1. New Year's Day — 1 January 2026 (Thursday)
+2. Australia Day — 26 January 2026 (Monday)
+3. Labour Day — 9 March 2026 (Monday)
+4. Good Friday — 3 April 2026 (Friday)
+5. Saturday before Easter Sunday — 4 April 2026 (Saturday)
+6. Easter Sunday — 5 April 2026 (Sunday)
+7. Easter Monday — 6 April 2026 (Monday)
+8. ANZAC Day — 25 April 2026 (Saturday)
+9. King's Birthday — 8 June 2026 (Monday)
+10. Friday before AFL Grand Final — 25 September 2026 (Friday)
+11. Melbourne Cup Day — 3 November 2026 (Tuesday)
+12. Christmas Day — 25 December 2026 (Friday)
+13. Boxing Day — 26 December 2026 (Saturday)
+14. Additional Boxing Day Public Holiday — 28 December 2026 (Monday)
+
+Rules when a customer asks if we are open (or tries to book/visit):
+- Always check {{CURRENT_DATE}} and any date, day, or holiday the customer mentions against the 2026 public holidays list above.
+- If the customer asks whether we are open on any of these days (including asking "are you open" or "are you open today" when {{CURRENT_DATE}} falls on one of these holidays, or asking about a specific holiday/date), you MUST reply: "No, we are closed due to [Holiday Name]" (e.g. "No, we are closed today due to Melbourne Cup Day") and let them know when we reopen with our normal trading hours ({{STORE_TRADING_HOURS}}).
+- Never tell a customer we are open on any of the above 2026 public holidays.
 
 ### LOCATION & ADDRESS INQUIRIES — MANDATORY RULE
 
@@ -854,6 +878,18 @@ export class ChatbotService {
           .replace(/\{\{BOOKING_LINK\}\}/g, '');
       }
 
+      const currentDateStr = new Date().toLocaleDateString('en-AU', {
+        timeZone: 'Australia/Melbourne',
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+      dynamicSystemPrompt = dynamicSystemPrompt.replace(
+        /\{\{CURRENT_DATE\}\}/g,
+        currentDateStr,
+      );
+
       const systemMessage: ChatMessage = {
         role: 'system',
         content: `${dynamicSystemPrompt}\n\nKNOWLEDGE BASE:\n${KNOWLEDGE_BASE}`,
@@ -963,6 +999,18 @@ export class ChatbotService {
         .replace(/\{\{ACTION_NOTES\}\}/g, '')
         .replace(/\{\{BOOKING_LINK\}\}/g, '');
     }
+
+    const currentDateStr = new Date().toLocaleDateString('en-AU', {
+      timeZone: 'Australia/Melbourne',
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+    dynamicSystemPrompt = dynamicSystemPrompt.replace(
+      /\{\{CURRENT_DATE\}\}/g,
+      currentDateStr,
+    );
 
     // Reconstruct history in OpenAI format
     const history: ChatMessage[] = [
