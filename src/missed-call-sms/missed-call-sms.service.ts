@@ -766,6 +766,40 @@ export class MissedCallSmsService {
         );
       }
     }
+
+    // ── Step 3: Close inactive replied threads (45 min after last reply) ───
+    const inactiveRepliedThreads =
+      (await this.smsThreadsService.findInactiveRepliedThreadsToClose?.()) ?? [];
+    if (inactiveRepliedThreads.length) {
+      this.logger.log(
+        `Inactive replied threads to auto-close: ${inactiveRepliedThreads.length}`,
+      );
+    }
+
+    for (const thread of inactiveRepliedThreads) {
+      const threadId = (thread as any)._id.toString();
+      const storeId = thread.storeId.toString();
+      const closeReason = ThreadStatus.CLOSED_ANSWERED;
+
+      try {
+        await this.smsThreadsService.closeThread(threadId, closeReason);
+        await this.loggingService.log(LogEventType.THREAD_CLOSED, {
+          callerNumber: thread.callerNumber,
+          storeId,
+          threadId,
+          metadata: {
+            closeReason,
+            trigger: 'reply_inactivity_timeout',
+            callbackRequested: thread.callbackRequested ?? false,
+          },
+        });
+      } catch (err: any) {
+        this.logger.error(
+          `Inactivity auto-close failed for thread ${threadId}: ${err.message}`,
+          err.stack,
+        );
+      }
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════

@@ -16,6 +16,8 @@ export { ThreadStatus };
 export const FOLLOW_UP_DELAY_MINUTES = 15;
 /** Thread is closed as no-response this many minutes after the follow-up. */
 export const CLOSE_AFTER_FOLLOW_UP_MINUTES = 45;
+/** Replied threads are auto-closed after this many minutes of inactivity since lastInteractionAt. */
+export const CLOSE_AFTER_REPLY_INACTIVITY_MINUTES = 45;
 /** Safety window: never send a follow-up for openings older than this. */
 export const FOLLOW_UP_MAX_AGE_HOURS = 6;
 
@@ -176,7 +178,8 @@ export class SmsThreadsService {
   }
 
   /**
-   * Records first customer reply.
+   * Records customer reply, updates lastInteractionAt (resetting the 45-min inactivity timer),
+   * and transitions status from sms_sent to active.
    */
   async setCustomerReplied(threadId: string): Promise<void> {
     await this.smsThreadModel
@@ -188,6 +191,12 @@ export class SmsThreadsService {
             lastInteractionAt: new Date(),
           },
         },
+      )
+      .exec();
+    await this.smsThreadModel
+      .updateOne(
+        { _id: threadId, status: ThreadStatus.SMS_SENT },
+        { $set: { status: ThreadStatus.ACTIVE } },
       )
       .exec();
   }
@@ -295,6 +304,27 @@ export class SmsThreadsService {
         customerReplied: false,
         status: ThreadStatus.SMS_SENT,
         followUpSentAt: { $ne: null, $lte: cutoff },
+      })
+      .exec();
+  }
+
+  /**
+   * Returns threads where the customer has replied (`customerReplied: true`),
+   * the thread is still open, and no new interaction has occurred for
+   * >= CLOSE_AFTER_REPLY_INACTIVITY_MINUTES (45 min).
+   */
+  async findInactiveRepliedThreadsToClose(): Promise<SmsThread[]> {
+    const cutoff = new Date(
+      Date.now() - CLOSE_AFTER_REPLY_INACTIVITY_MINUTES * 60 * 1000,
+    );
+    return this.smsThreadModel
+      .find({
+        customerReplied: true,
+        status: { $nin: CLOSED_STATUSES },
+        $or: [
+          { lastInteractionAt: { $ne: null, $lte: cutoff } },
+          { lastInteractionAt: null, updatedAt: { $lte: cutoff } },
+        ],
       })
       .exec();
   }
@@ -459,6 +489,8 @@ export class SmsThreadsService {
         openingSentAt: obj.openingSentAt || null,
         lastInteractionAt: obj.lastInteractionAt || null,
         followUpSentAt: obj.followUpSentAt || null,
+        callbackRequested: obj.callbackRequested ?? false,
+        callbackRequestedAt: obj.callbackRequestedAt || null,
         closedAt: obj.closedAt || null,
         closedReason: obj.closedReason || null,
         createdAt: obj.createdAt,
@@ -504,6 +536,8 @@ export class SmsThreadsService {
       openingSentAt: obj.openingSentAt || null,
       lastInteractionAt: obj.lastInteractionAt || null,
       followUpSentAt: obj.followUpSentAt || null,
+      callbackRequested: obj.callbackRequested ?? false,
+      callbackRequestedAt: obj.callbackRequestedAt || null,
       closedAt: obj.closedAt || null,
       closedReason: obj.closedReason || null,
       createdAt: obj.createdAt,

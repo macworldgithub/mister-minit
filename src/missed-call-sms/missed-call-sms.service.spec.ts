@@ -436,4 +436,58 @@ describe('MissedCallSmsService - buildOpeningSms', () => {
       expect(emails).toEqual(['default@neximet.com']);
     });
   });
+
+  describe('45m Inactivity Auto-Close after Customer Reply', () => {
+    it('should close both ghosted follow-up threads (closed_no_response) and 45m inactive replied threads (closed_answered)', async () => {
+      const mockSmsThreadsService = {
+        findThreadsForFollowUp: jest.fn().mockResolvedValue([]),
+        findThreadsToClose: jest.fn().mockResolvedValue([
+          {
+            _id: 'ghosted-thread-1',
+            callerNumber: '61400000001',
+            storeId: 'store-1',
+            customerReplied: false,
+          },
+        ]),
+        findInactiveRepliedThreadsToClose: jest.fn().mockResolvedValue([
+          {
+            _id: 'replied-thread-2',
+            callerNumber: '61407026749',
+            storeId: 'store-2',
+            customerReplied: true,
+            callbackRequested: true,
+          },
+        ]),
+        closeThread: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const mockLoggingService = {
+        log: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const service = new MissedCallSmsService(
+        {} as any,
+        mockSmsThreadsService as any,
+        {} as any,
+        {} as any,
+        mockLoggingService as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+      );
+
+      await service.runFollowUpScheduler();
+
+      expect(mockSmsThreadsService.closeThread).toHaveBeenCalledWith(
+        'ghosted-thread-1',
+        'closed_no_response',
+      );
+      expect(mockSmsThreadsService.closeThread).toHaveBeenCalledWith(
+        'replied-thread-2',
+        'closed_answered',
+      );
+    });
+  });
 });
