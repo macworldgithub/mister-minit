@@ -779,7 +779,9 @@ export class MissedCallSmsService {
     for (const thread of inactiveRepliedThreads) {
       const threadId = (thread as any)._id.toString();
       const storeId = thread.storeId.toString();
-      const closeReason = ThreadStatus.CLOSED_ANSWERED;
+      const closeReason = thread.callbackRequested
+        ? ThreadStatus.CLOSED_CALLBACK
+        : ThreadStatus.CLOSED_COMPLETED;
 
       try {
         await this.smsThreadsService.closeThread(threadId, closeReason);

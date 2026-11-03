@@ -457,6 +457,13 @@ describe('MissedCallSmsService - buildOpeningSms', () => {
             customerReplied: true,
             callbackRequested: true,
           },
+          {
+            _id: 'replied-thread-3',
+            callerNumber: '0448652915',
+            storeId: 'store-3',
+            customerReplied: true,
+            callbackRequested: false,
+          },
         ]),
         closeThread: jest.fn().mockResolvedValue(undefined),
       };
@@ -486,7 +493,11 @@ describe('MissedCallSmsService - buildOpeningSms', () => {
       );
       expect(mockSmsThreadsService.closeThread).toHaveBeenCalledWith(
         'replied-thread-2',
-        'closed_answered',
+        'closed_callback',
+      );
+      expect(mockSmsThreadsService.closeThread).toHaveBeenCalledWith(
+        'replied-thread-3',
+        'closed_completed',
       );
     });
   });

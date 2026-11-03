@@ -12,6 +12,8 @@ export enum ThreadStatus {
   CLOSED_NO_RESPONSE = 'closed_no_response',
   CLOSED_OPTED_OUT = 'closed_opted_out',
   CLOSED_ANSWERED = 'closed_answered',
+  CLOSED_CALLBACK = 'closed_callback',
+  CLOSED_COMPLETED = 'closed_completed',
 }
 
 export const CLOSED_STATUSES: ThreadStatus[] = [
@@ -19,6 +21,8 @@ export const CLOSED_STATUSES: ThreadStatus[] = [
   ThreadStatus.CLOSED_NO_RESPONSE,
   ThreadStatus.CLOSED_OPTED_OUT,
   ThreadStatus.CLOSED_ANSWERED,
+  ThreadStatus.CLOSED_CALLBACK,
+  ThreadStatus.CLOSED_COMPLETED,
 ];
 
 // ─── Sub-documents ────────────────────────────────────────────────────────────
