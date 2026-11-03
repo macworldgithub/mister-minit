@@ -2,6 +2,47 @@ import { Injectable, Logger } from '@nestjs/common';
 import { StoreConfigService } from '../store-config/store-config.service';
 import OpenAI from 'openai';
 
+export const PUBLIC_HOLIDAYS_2026: Record<string, string> = {
+  '2026-01-01': "New Year's Day",
+  '2026-01-26': 'Australia Day',
+  '2026-03-09': 'Labour Day',
+  '2026-04-03': 'Good Friday',
+  '2026-04-04': 'Saturday before Easter Sunday',
+  '2026-04-05': 'Easter Sunday',
+  '2026-04-06': 'Easter Monday',
+  '2026-04-25': 'ANZAC Day',
+  '2026-06-08': "King's Birthday",
+  '2026-09-25': 'Friday before AFL Grand Final',
+  '2026-11-03': 'Melbourne Cup Day',
+  '2026-12-25': 'Christmas Day',
+  '2026-12-26': 'Boxing Day',
+  '2026-12-28': 'Additional Boxing Day Public Holiday',
+};
+
+export function getAustralianTodayDate(): {
+  isoDate: string;
+  formatted: string;
+  holidayName: string | null;
+} {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Australia/Melbourne',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const isoDate = formatter.format(now);
+  const formatted = now.toLocaleDateString('en-AU', {
+    timeZone: 'Australia/Melbourne',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  const holidayName = PUBLIC_HOLIDAYS_2026[isoDate] || null;
+  return { isoDate, formatted, holidayName };
+}
+
 export const SYSTEM_PROMPT = `
 ### IDENTITY & ROLE
 
@@ -23,9 +64,10 @@ You are representing:
 Always use this store's name, location, and hours naturally in conversation. Never give generic or placeholder answers.
 Always refer back to the store the customer originally called.Never suggest a different store location.
 
-### 2026 PUBLIC HOLIDAYS — MANDATORY CLOSURE RULE
+{{HOLIDAY_STATUS_DIRECTIVE}}
 
-All stores are CLOSED on the following 2026 public holidays:
+### 2026 PUBLIC HOLIDAYS LIST
+All Mister Minit stores are CLOSED on all 14 official 2026 public holidays:
 1. New Year's Day — 1 January 2026 (Thursday)
 2. Australia Day — 26 January 2026 (Monday)
 3. Labour Day — 9 March 2026 (Monday)
@@ -41,10 +83,9 @@ All stores are CLOSED on the following 2026 public holidays:
 13. Boxing Day — 26 December 2026 (Saturday)
 14. Additional Boxing Day Public Holiday — 28 December 2026 (Monday)
 
-Rules when a customer asks if we are open (or tries to book/visit):
-- Always check {{CURRENT_DATE}} and any date, day, or holiday the customer mentions against the 2026 public holidays list above.
-- If the customer asks whether we are open on any of these days (including asking "are you open" or "are you open today" when {{CURRENT_DATE}} falls on one of these holidays, or asking about a specific holiday/date), you MUST reply: "No, we are closed due to [Holiday Name]" (e.g. "No, we are closed today due to Melbourne Cup Day") and let them know when we reopen with our normal trading hours ({{STORE_TRADING_HOURS}}).
-- Never tell a customer we are open on any of the above 2026 public holidays.
+Rules:
+- If a customer asks if we are open on any listed holiday or on a date that is a public holiday, you MUST reply: "No, we are closed due to [Holiday Name]" and mention when we reopen with normal trading hours ({{STORE_TRADING_HOURS}}).
+- Never tell a customer we are open or invite them to come in on any of these 14 public holidays.
 
 ### LOCATION & ADDRESS INQUIRIES — MANDATORY RULE
 
@@ -878,17 +919,14 @@ export class ChatbotService {
           .replace(/\{\{BOOKING_LINK\}\}/g, '');
       }
 
-      const currentDateStr = new Date().toLocaleDateString('en-AU', {
-        timeZone: 'Australia/Melbourne',
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      });
-      dynamicSystemPrompt = dynamicSystemPrompt.replace(
-        /\{\{CURRENT_DATE\}\}/g,
-        currentDateStr,
-      );
+      const { formatted: currentDateStr, holidayName: todayHoliday } =
+        getAustralianTodayDate();
+      dynamicSystemPrompt = dynamicSystemPrompt
+        .replace(/\{\{CURRENT_DATE\}\}/g, currentDateStr)
+        .replace(
+          /\{\{HOLIDAY_STATUS_DIRECTIVE\}\}/g,
+          this.buildHolidayDirective(currentDateStr, todayHoliday),
+        );
 
       const systemMessage: ChatMessage = {
         role: 'system',
@@ -954,6 +992,28 @@ export class ChatbotService {
     // In a real application, you would use an SMS provider like Twilio, MessageBird, etc.
   }
 
+  private buildHolidayDirective(
+    currentDateStr: string,
+    todayHoliday: string | null,
+  ): string {
+    if (todayHoliday) {
+      return (
+        `### 🚨 CRITICAL TODAY STATUS — PUBLIC HOLIDAY CLOSURE\n` +
+        `TODAY (${currentDateStr}) IS AN OFFICIAL PUBLIC HOLIDAY: ${todayHoliday}.\n` +
+        `ALL MISTER MINIT STORES ARE CLOSED TODAY.\n` +
+        `- If the customer asks if we are open today, asks what our hours are today, or asks to come in / pop in / visit today for ANY service (keys, shoes, engraving, watch, padlocks, remotes, etc.):\n` +
+        `  You MUST reply: "No, we are closed today due to ${todayHoliday}." Then state when we reopen on the next business day with normal trading hours ({{STORE_TRADING_HOURS}}).\n` +
+        `- NEVER say "Yes we are open today". NEVER invite them to visit or pop in today. NEVER accept same-day visits today.`
+      );
+    }
+    return (
+      `### TODAY STATUS — REGULAR TRADING DAY\n` +
+      `TODAY (${currentDateStr}) is a standard trading day (NOT a public holiday).\n` +
+      `Stores operate according to standard trading hours: {{STORE_TRADING_HOURS}}.\n` +
+      `If a customer asks about a specific future public holiday, confirm that stores will be closed on that public holiday.`
+    );
+  }
+
   // ── New structured entry point consumed by MissedCallSmsService ────────────
 
   async handleMessage(params: {
@@ -1000,17 +1060,14 @@ export class ChatbotService {
         .replace(/\{\{BOOKING_LINK\}\}/g, '');
     }
 
-    const currentDateStr = new Date().toLocaleDateString('en-AU', {
-      timeZone: 'Australia/Melbourne',
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
-    dynamicSystemPrompt = dynamicSystemPrompt.replace(
-      /\{\{CURRENT_DATE\}\}/g,
-      currentDateStr,
-    );
+    const { formatted: currentDateStr, holidayName: todayHoliday } =
+      getAustralianTodayDate();
+    dynamicSystemPrompt = dynamicSystemPrompt
+      .replace(/\{\{CURRENT_DATE\}\}/g, currentDateStr)
+      .replace(
+        /\{\{HOLIDAY_STATUS_DIRECTIVE\}\}/g,
+        this.buildHolidayDirective(currentDateStr, todayHoliday),
+      );
 
     // Reconstruct history in OpenAI format
     const history: ChatMessage[] = [

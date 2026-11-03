@@ -22,7 +22,8 @@ describe('ChatbotService - SYSTEM_PROMPT Rules', () => {
   });
 
   it('should include all 14 2026 public holidays and mandatory closure rule', () => {
-    expect(SYSTEM_PROMPT).toContain('2026 PUBLIC HOLIDAYS — MANDATORY CLOSURE RULE');
+    expect(SYSTEM_PROMPT).toContain('2026 PUBLIC HOLIDAYS LIST');
+    expect(SYSTEM_PROMPT).toContain('{{HOLIDAY_STATUS_DIRECTIVE}}');
     expect(SYSTEM_PROMPT).toContain('{{CURRENT_DATE}}');
     expect(SYSTEM_PROMPT).toContain("New Year's Day — 1 January 2026 (Thursday)");
     expect(SYSTEM_PROMPT).toContain('Australia Day — 26 January 2026 (Monday)');
