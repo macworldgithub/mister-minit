@@ -964,6 +964,12 @@ export class MissedCallSmsService {
     body: string,
     maxAttempts: number,
   ): Promise<boolean> {
+    if (await this.optOutService.isOptedOut(to)) {
+      this.logger.warn(
+        `[OUTBOUND SMS BLOCKED] Recipient ${to} is in opt-out / permanent blocklist. Aborting SMS send.`,
+      );
+      return false;
+    }
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const ok = await this.smsProviderService.sendSms(to, body);

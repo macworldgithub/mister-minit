@@ -11,16 +11,21 @@ export class OptOut {
   @Prop({ type: String, required: true, index: true })
   callerNumber: string;
 
-  @Prop({ type: String, required: true })
+  @Prop({ type: String, required: true, default: 'BLOCK' })
   keyword: string;
 
-  @Prop({ type: Date, required: true })
+  @Prop({ type: Date, required: true, default: () => new Date() })
   optOutAt: Date;
 
-  @Prop({ type: String, enum: ['keyword', 'llm_detected'], required: true })
-  source: 'keyword' | 'llm_detected';
+  @Prop({
+    type: String,
+    enum: ['keyword', 'llm_detected', 'manual_suppression', 'blocked'],
+    required: true,
+    default: 'manual_suppression',
+  })
+  source: 'keyword' | 'llm_detected' | 'manual_suppression' | 'blocked';
 
-  @Prop({ type: String, required: true })
+  @Prop({ type: String, required: false, default: 'manual' })
   threadId: string;
 
   @Prop({ type: Date })

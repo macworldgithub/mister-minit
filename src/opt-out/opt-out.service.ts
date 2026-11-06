@@ -7,9 +7,23 @@ import { getPhoneNumberVariations } from '../sms-threads/sms-threads.service';
 export interface AddOptOutPayload {
   callerNumber: string;
   keyword: string;
-  source: 'keyword' | 'llm_detected';
-  threadId: string;
+  source: 'keyword' | 'llm_detected' | 'manual_suppression' | 'blocked';
+  threadId?: string;
 }
+
+/**
+ * Permanent internal blocklist: these numbers are permanently suppressed
+ * at the system level and will NEVER receive any SMS (missed-call opening,
+ * follow-up, inbound replies, or manual SMS).
+ */
+export const INTERNAL_BLOCKED_NUMBERS = new Set([
+  '0405434292',
+  '61405434292',
+  '+61405434292',
+  '0406500312',
+  '61406500312',
+  '+61406500312',
+]);
 
 @Injectable()
 export class OptOutService {
@@ -20,12 +34,37 @@ export class OptOutService {
   ) {}
 
   /**
-   * Returns true if the number has previously opted out.
+   * Returns true if the number has previously opted out or is in the permanent blocklist.
    * Indexed lookup — O(log n).
    */
   async isOptedOut(callerNumber: string): Promise<boolean> {
+    if (!callerNumber) return false;
+    const variations = getPhoneNumberVariations(callerNumber);
+
+    // 1. Check permanent hardcoded blocklist
+    for (const v of variations) {
+      if (INTERNAL_BLOCKED_NUMBERS.has(v) || INTERNAL_BLOCKED_NUMBERS.has(v.replace(/\D/g, ''))) {
+        return true;
+      }
+    }
+
+    // 2. Check environment variable BLOCKED_PHONE_NUMBERS
+    const envBlocked = (process.env.BLOCKED_PHONE_NUMBERS || '')
+      .split(',')
+      .map((s) => s.trim().replace(/\D/g, ''))
+      .filter(Boolean);
+    if (envBlocked.length > 0) {
+      for (const v of variations) {
+        const vDigits = v.replace(/\D/g, '');
+        if (envBlocked.some((b) => b === vDigits || vDigits.endsWith(b) || b.endsWith(vDigits))) {
+          return true;
+        }
+      }
+    }
+
+    // 3. Check MongoDB opt-outs collection
     const exists = await this.optOutModel
-      .exists({ callerNumber: { $in: getPhoneNumberVariations(callerNumber) } })
+      .exists({ callerNumber: { $in: variations } })
       .exec();
     return exists !== null;
   }
@@ -49,9 +88,9 @@ export class OptOutService {
 
       await this.optOutModel.create({
         callerNumber: payload.callerNumber,
-        keyword: payload.keyword,
+        keyword: payload.keyword || 'BLOCK',
         source: payload.source,
-        threadId: payload.threadId,
+        threadId: payload.threadId || 'manual',
         optOutAt: new Date(),
       });
 
@@ -68,11 +107,58 @@ export class OptOutService {
   }
 
   /**
+   * Manually blocks a phone number from receiving any SMS.
+   */
+  async blockNumber(
+    callerNumber: string,
+    reason: 'manual_suppression' | 'blocked' = 'manual_suppression',
+  ): Promise<{ success: boolean; callerNumber: string }> {
+    const cleanNumber = callerNumber.trim().replace(/[\s\-()]/g, '');
+    const variations = getPhoneNumberVariations(cleanNumber);
+
+    const already = await this.optOutModel
+      .exists({ callerNumber: { $in: variations } })
+      .exec();
+
+    if (!already) {
+      await this.optOutModel.create({
+        callerNumber: cleanNumber,
+        keyword: 'INTERNAL_BLOCK',
+        source: reason,
+        threadId: 'manual',
+        optOutAt: new Date(),
+      });
+      this.logger.log(`[MANUAL BLOCK] Number ${cleanNumber} permanently blocked.`);
+    }
+
+    return { success: true, callerNumber: cleanNumber };
+  }
+
+  /**
+   * Removes a phone number from the opt-out / blocklist.
+   */
+  async removeOptOut(
+    callerNumber: string,
+  ): Promise<{ success: boolean; deletedCount: number }> {
+    const variations = getPhoneNumberVariations(callerNumber);
+    const result = await this.optOutModel
+      .deleteMany({ callerNumber: { $in: variations } })
+      .exec();
+    this.logger.log(
+      `[MANUAL UNBLOCK] Number ${callerNumber} unblocked (removed ${result.deletedCount || 0} records).`,
+    );
+    return {
+      success: (result.deletedCount || 0) > 0,
+      deletedCount: result.deletedCount || 0,
+    };
+  }
+
+  /**
    * Retrieves paginated opt-out records with optional search filter.
    */
   async findOptOuts(filter: {
     search?: string;
-    source?: 'keyword' | 'llm_detected';
+    source?: 'keyword' | 'llm_detected' | 'manual_suppression' | 'blocked' | string;
     startDate?: string;
     endDate?: string;
     limit?: number;
