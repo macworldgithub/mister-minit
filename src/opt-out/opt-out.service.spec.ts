@@ -60,6 +60,17 @@ describe('OptOutService', () => {
       expect(result).toBe(false);
       expect(mockModel.exists).toHaveBeenCalled();
     });
+
+    it('should not block numbers that differ by one digit from blocked numbers', async () => {
+      mockModel.exists.mockReturnValue({ exec: jest.fn().mockResolvedValue(null) });
+      // 0405434292 is blocked, but 0405434293 is NOT
+      expect(await service.isOptedOut('0405434293')).toBe(false);
+      // 0406500312 is blocked, but 0406500311 is NOT
+      expect(await service.isOptedOut('0406500311')).toBe(false);
+      // Other random Australian numbers
+      expect(await service.isOptedOut('0438670886')).toBe(false);
+      expect(await service.isOptedOut('0411100371')).toBe(false);
+    });
   });
 
   describe('blockNumber', () => {
@@ -85,3 +96,4 @@ describe('OptOutService', () => {
     });
   });
 });
+

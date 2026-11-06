@@ -48,15 +48,18 @@ export class OptOutService {
       }
     }
 
-    // 2. Check environment variable BLOCKED_PHONE_NUMBERS
-    const envBlocked = (process.env.BLOCKED_PHONE_NUMBERS || '')
-      .split(',')
-      .map((s) => s.trim().replace(/\D/g, ''))
-      .filter(Boolean);
-    if (envBlocked.length > 0) {
+    // 2. Check environment variable BLOCKED_PHONE_NUMBERS (strict exact match)
+    const envBlockedStr = process.env.BLOCKED_PHONE_NUMBERS || '';
+    if (envBlockedStr.trim()) {
+      const envBlockedSet = new Set(
+        envBlockedStr
+          .split(',')
+          .map((s) => s.trim().replace(/\D/g, ''))
+          .filter(Boolean),
+      );
       for (const v of variations) {
         const vDigits = v.replace(/\D/g, '');
-        if (envBlocked.some((b) => b === vDigits || vDigits.endsWith(b) || b.endsWith(vDigits))) {
+        if (envBlockedSet.has(vDigits) || envBlockedSet.has(v)) {
           return true;
         }
       }
