@@ -2,7 +2,17 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { OptOut, OptOutDocument } from './opt-out.schema';
-import { getPhoneNumberVariations } from '../sms-threads/sms-threads.service';
+import {
+  INTERNAL_BLOCKED_NUMBERS,
+  getPhoneNumberVariations,
+  getAllBlockedPhoneVariations,
+} from '../config/blocked-numbers.config';
+
+export {
+  INTERNAL_BLOCKED_NUMBERS,
+  getPhoneNumberVariations,
+  getAllBlockedPhoneVariations,
+};
 
 export interface AddOptOutPayload {
   callerNumber: string;
@@ -10,20 +20,6 @@ export interface AddOptOutPayload {
   source: 'keyword' | 'llm_detected' | 'manual_suppression' | 'blocked';
   threadId?: string;
 }
-
-/**
- * Permanent internal blocklist: these numbers are permanently suppressed
- * at the system level and will NEVER receive any SMS (missed-call opening,
- * follow-up, inbound replies, or manual SMS).
- */
-export const INTERNAL_BLOCKED_NUMBERS = new Set([
-  '0405434292',
-  '61405434292',
-  '+61405434292',
-  '0406500312',
-  '61406500312',
-  '+61406500312',
-]);
 
 @Injectable()
 export class OptOutService {
@@ -177,11 +173,21 @@ export class OptOutService {
 
     const query: Record<string, any> = {};
 
+    // Exclude internal permanently blocked numbers from public FE view
+    const blockedVariations = getAllBlockedPhoneVariations();
+    query.callerNumber = { $nin: blockedVariations };
+
     if (filter.search && filter.search.trim()) {
-      query.callerNumber = { $regex: filter.search.trim(), $options: 'i' };
+      query.callerNumber = {
+        $regex: filter.search.trim(),
+        $options: 'i',
+        $nin: blockedVariations,
+      };
     }
     if (filter.source) {
       query.source = filter.source;
+    } else {
+      query.source = { $nin: ['manual_suppression', 'blocked'] };
     }
     if (filter.startDate || filter.endDate) {
       query.optOutAt = {};

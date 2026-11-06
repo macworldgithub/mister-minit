@@ -11,6 +11,7 @@ import { Cdr, CdrDocument } from './cdr.schema';
 import { CreateCdrDto } from './cdr.dto';
 import { StoreConfigService } from '../store-config/store-config.service';
 import { getMissedCallRule } from './cdr-call-outcome.util';
+import { getAllBlockedPhoneVariations } from '../config/blocked-numbers.config';
 import * as net from 'net';
 
 const MAX_BUFFER_SIZE = 10 * 1024; // 10KB
@@ -280,13 +281,19 @@ export class CdrService implements OnModuleInit, OnModuleDestroy {
     }
 
     // 3. Build MongoDB query
+    const blockedVariations = getAllBlockedPhoneVariations();
     const query: Record<string, any> = {
       'dial-no': { $in: targetDids },
+      'from-no': { $nin: blockedVariations },
     };
 
     if (filter.search && filter.search.trim()) {
       const cleanSearch = filter.search.trim();
-      query['from-no'] = { $regex: cleanSearch, $options: 'i' };
+      query['from-no'] = {
+        $regex: cleanSearch,
+        $options: 'i',
+        $nin: blockedVariations,
+      };
     }
 
     // Date range

@@ -10,6 +10,12 @@ import {
   BookingDetails,
 } from './sms-thread.schema';
 
+import {
+  getPhoneNumberVariations,
+  getAllBlockedPhoneVariations,
+} from '../config/blocked-numbers.config';
+
+export { getPhoneNumberVariations, getAllBlockedPhoneVariations };
 export { ThreadStatus };
 
 /** Follow-up is sent this many minutes after the opening SMS if no reply. */
@@ -20,31 +26,6 @@ export const CLOSE_AFTER_FOLLOW_UP_MINUTES = 45;
 export const CLOSE_AFTER_REPLY_INACTIVITY_MINUTES = 45;
 /** Safety window: never send a follow-up for openings older than this. */
 export const FOLLOW_UP_MAX_AGE_HOURS = 6;
-
-export function getPhoneNumberVariations(phone: string): string[] {
-  if (!phone) return [];
-  const trimmed = phone.trim();
-  const digits = trimmed.replace(/\D/g, '');
-  const variations = new Set<string>();
-  variations.add(trimmed);
-  variations.add(digits);
-
-  if (digits.startsWith('61') && digits.length === 11) {
-    variations.add(`+${digits}`);
-    variations.add(digits);
-    variations.add(`0${digits.slice(2)}`);
-  } else if (digits.startsWith('04') && digits.length === 10) {
-    variations.add(digits);
-    variations.add(`61${digits.slice(1)}`);
-    variations.add(`+61${digits.slice(1)}`);
-  } else if (digits.startsWith('4') && digits.length === 9) {
-    variations.add(`0${digits}`);
-    variations.add(`61${digits}`);
-    variations.add(`+61${digits}`);
-  }
-
-  return Array.from(variations);
-}
 
 @Injectable()
 export class SmsThreadsService {
@@ -436,10 +417,18 @@ export class SmsThreadsService {
       query.did = filter.did;
     }
 
+    // Hide permanently blocked numbers from all FE thread listings
+    const blockedVariations = getAllBlockedPhoneVariations();
+    query.callerNumber = { $nin: blockedVariations };
+
     // Search phone number
     if (filter.search && filter.search.trim()) {
       const cleanSearch = filter.search.trim();
-      query.callerNumber = { $regex: cleanSearch, $options: 'i' };
+      query.callerNumber = {
+        $regex: cleanSearch,
+        $options: 'i',
+        $nin: blockedVariations,
+      };
     }
 
     // Date range filter

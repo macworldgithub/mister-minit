@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { getAllBlockedPhoneVariations } from '../config/blocked-numbers.config';
 import {
   SuppressedEvent,
   SuppressedEventDocument,
@@ -77,6 +78,9 @@ export class SuppressedEventsService {
 
     const query: Record<string, any> = {};
 
+    const blockedVariations = getAllBlockedPhoneVariations();
+    query.callerNumber = { $nin: blockedVariations };
+
     if (filter.reason) {
       query.suppressedReason = filter.reason;
     }
@@ -87,7 +91,11 @@ export class SuppressedEventsService {
       query.did = filter.did;
     }
     if (filter.search && filter.search.trim()) {
-      query.callerNumber = { $regex: filter.search.trim(), $options: 'i' };
+      query.callerNumber = {
+        $regex: filter.search.trim(),
+        $options: 'i',
+        $nin: blockedVariations,
+      };
     }
     if (filter.startDate || filter.endDate) {
       query.createdAt = {};
