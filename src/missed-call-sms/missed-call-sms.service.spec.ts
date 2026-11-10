@@ -748,5 +748,144 @@ describe('MissedCallSmsService - buildOpeningSms', () => {
         expect.stringContaining('shoe repair'),
       );
     });
+
+    it('should send short final note and close thread when caller replies "Yes please" a 3rd time (after reassurance)', async () => {
+      const threadWithReassurance: any = {
+        _id: 'thread-1',
+        callerNumber: '0412938090',
+        storeId: 'store-tok-h',
+        status: 'open',
+        callbackRequested: true,
+        conversationHistory: [
+          {
+            role: 'assistant',
+            content:
+              'Would you like one of our store team members to call you back? Reply Y or N',
+          },
+          {
+            role: 'user',
+            content: 'Yes please',
+          },
+          {
+            role: 'assistant',
+            content:
+              "Thanks! I've notified the team at Mister Minit TOK H — you'll receive a call back soon.",
+          },
+          {
+            role: 'user',
+            content: 'Yes please',
+          },
+          {
+            role: 'assistant',
+            content:
+              "We've already notified the team at Mister Minit TOK H about your callback request, and someone will be in touch shortly! In the meantime, feel free to message if you'd like to book a specific service or have any questions.",
+          },
+        ],
+        messageCount: 5,
+      };
+
+      mockSmsThreadsService = {
+        findActiveThread: jest.fn().mockResolvedValue(threadWithReassurance),
+        findMostRecentByCallerNumber: jest
+          .fn()
+          .mockResolvedValue(threadWithReassurance),
+        findThreadById: jest.fn().mockResolvedValue(threadWithReassurance),
+        appendToHistory: jest.fn().mockResolvedValue(true),
+        setCustomerReplied: jest.fn().mockResolvedValue(true),
+        setCallbackRequested: jest.fn().mockResolvedValue(true),
+        closeThread: jest.fn().mockResolvedValue(true),
+        incrementMessageCount: jest.fn().mockResolvedValue(true),
+      };
+
+      service = new MissedCallSmsService(
+        mockStoreConfigService,
+        mockSmsThreadsService,
+        mockOptOutService,
+        mockSuppressedEventsService,
+        mockLoggingService,
+        {} as any,
+        mockSmsProviderService,
+        {} as any,
+        mockMailService,
+        mockConfigService,
+      );
+
+      const res = await service.handleInboundSms({
+        from: '0412938090',
+        to: '0400000000',
+        body: 'Yes please',
+        receivedAt: new Date().toISOString(),
+      });
+
+      // No email & no staff SMS
+      expect(mockMailService.sendEmail).not.toHaveBeenCalled();
+      expect(mockSmsProviderService.sendSms).not.toHaveBeenCalledWith(
+        '0499999999',
+        expect.anything(),
+      );
+      // Final acknowledgment sent to customer
+      expect(res.replyText).toContain('Understood! No further action needed');
+      expect(res.replyText).toContain('team has your request and will call you soon');
+      // Thread closed immediately
+      expect(mockSmsThreadsService.closeThread).toHaveBeenCalledWith(
+        'thread-1',
+        'closed_callback',
+      );
+    });
+
+    it('should stay silent (send no SMS) if caller replies "Yes" after final note has already been sent', async () => {
+      const threadWithFinalAck: any = {
+        _id: 'thread-1',
+        callerNumber: '0412938090',
+        storeId: 'store-tok-h',
+        status: 'closed_callback',
+        callbackRequested: true,
+        conversationHistory: [
+          {
+            role: 'assistant',
+            content:
+              'Understood! No further action needed — the team has your request and will call you soon.',
+          },
+        ],
+        messageCount: 6,
+      };
+
+      mockSmsThreadsService = {
+        findActiveThread: jest.fn().mockResolvedValue(null),
+        // Since thread is closed, findMostRecentByCallerNumber returns null
+        findMostRecentByCallerNumber: jest.fn().mockResolvedValue(null),
+        findThreadById: jest.fn().mockResolvedValue(threadWithFinalAck),
+        appendToHistory: jest.fn().mockResolvedValue(true),
+        setCustomerReplied: jest.fn().mockResolvedValue(true),
+        setCallbackRequested: jest.fn().mockResolvedValue(true),
+        closeThread: jest.fn().mockResolvedValue(true),
+        incrementMessageCount: jest.fn().mockResolvedValue(true),
+      };
+
+      service = new MissedCallSmsService(
+        mockStoreConfigService,
+        mockSmsThreadsService,
+        mockOptOutService,
+        mockSuppressedEventsService,
+        mockLoggingService,
+        {} as any,
+        mockSmsProviderService,
+        {} as any,
+        mockMailService,
+        mockConfigService,
+      );
+
+      const res = await service.handleInboundSms({
+        from: '0412938090',
+        to: '0400000000',
+        body: 'Yes please',
+        receivedAt: new Date().toISOString(),
+      });
+
+      // Completely discarded without sending any SMS
+      expect(res.discarded).toBe(true);
+      expect(mockSmsProviderService.sendSms).not.toHaveBeenCalled();
+      expect(mockMailService.sendEmail).not.toHaveBeenCalled();
+    });
   });
 });

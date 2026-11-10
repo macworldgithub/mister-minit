@@ -876,23 +876,63 @@ export class MissedCallSmsService {
     const { from, body, threadId, storeId, store, source } = params;
     const storeName = store?.storeName ?? '';
 
+    const currentThread = await this.smsThreadsService.findThreadById(threadId);
     const alreadyNotified =
-      params.alreadyNotified ??
-      (await this.smsThreadsService.findThreadById(threadId))?.callbackRequested === true;
+      params.alreadyNotified ?? currentThread?.callbackRequested === true;
 
-    // Use the LLM wording only when it clearly confirms/reassures a call back
-    // (e.g. it also answered a question); otherwise fixed confirmation/reassurance.
+    const history = currentThread?.conversationHistory || [];
+    const hasSentReassurance = history.some(
+      (m: any) =>
+        m.role === 'assistant' &&
+        /already notified the team|about your callback request/i.test(m.content || ''),
+    );
+    const hasSentFinalAck = history.some(
+      (m: any) =>
+        m.role === 'assistant' &&
+        /No further action needed|team has your request and will call you soon/i.test(
+          m.content || '',
+        ),
+    );
+
+    // If final ack was already sent, send nothing (silence) and ensure thread is closed
+    if (alreadyNotified && hasSentFinalAck) {
+      this.logger.log(
+        `[CALLBACK REQUEST] Caller ${from} sent repeated affirmative after final ack on thread ${threadId}. Discarding silently.`,
+      );
+      try {
+        await this.smsThreadsService.closeThread(
+          threadId,
+          ThreadStatus.CLOSED_CALLBACK,
+        );
+      } catch (_) {}
+      return {
+        ...(params.chatbotResponse || {}),
+        replyText: null,
+        humanCallbackRequested: false,
+        threadId,
+      };
+    }
+
     const llmReply = (params.replyText || '').trim();
     let replyText: string;
+    let shouldCloseThread = false;
 
     if (alreadyNotified) {
-      replyText =
-        llmReply &&
-        !/notified the team|let the team know/i.test(llmReply) &&
-        !/reach out soon/i.test(llmReply)
-          ? llmReply
-          : this.buildDuplicateCallbackReassurance(store);
+      if (hasSentReassurance) {
+        // 3rd+ affirmative: send short final note and close thread immediately
+        replyText = this.buildFinalCallbackAck();
+        shouldCloseThread = true;
+      } else {
+        // 2nd affirmative: reassurance message, keep thread open
+        replyText =
+          llmReply &&
+          !/notified the team|let the team know/i.test(llmReply) &&
+          !/reach out soon/i.test(llmReply)
+            ? llmReply
+            : this.buildDuplicateCallbackReassurance(store);
+      }
     } else {
+      // 1st affirmative: initial confirmation
       replyText =
         llmReply && /call/i.test(llmReply)
           ? llmReply
@@ -918,8 +958,41 @@ export class MissedCallSmsService {
         storeId,
         storeName,
         threadId,
-        metadata: { inboundBody: body, source, duplicateSuppressed: true },
+        metadata: {
+          inboundBody: body,
+          source,
+          duplicateSuppressed: true,
+          closedImmediately: shouldCloseThread,
+        },
       });
+
+      if (shouldCloseThread) {
+        try {
+          await this.smsThreadsService.closeThread(
+            threadId,
+            ThreadStatus.CLOSED_CALLBACK,
+          );
+          await this.loggingService.log(LogEventType.THREAD_CLOSED, {
+            callerNumber: from,
+            storeId,
+            storeName,
+            threadId,
+            metadata: {
+              closeReason: ThreadStatus.CLOSED_CALLBACK,
+              trigger: 'repeated_callback_final_ack',
+            },
+          });
+          this.logger.log(
+            `[CALLBACK REQUEST] Closed thread ${threadId} for caller ${from} after sending final callback acknowledgment.`,
+          );
+        } catch (err: any) {
+          this.logger.error(
+            `Failed to close thread ${threadId} after final callback ack: ${err.message}`,
+            err.stack,
+          );
+        }
+      }
+
       return {
         ...(params.chatbotResponse || {}),
         replyText,
@@ -1167,6 +1240,10 @@ export class MissedCallSmsService {
       `We've already notified the team at ${displayName} about your callback request, and someone will be in touch shortly! ` +
       `In the meantime, feel free to message if you'd like to book a specific service or have any questions.`
     );
+  }
+
+  public buildFinalCallbackAck(): string {
+    return 'Understood! No further action needed — the team has your request and will call you soon.';
   }
 
   public buildCallbackStaffNotification(
