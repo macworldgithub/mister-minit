@@ -557,14 +557,6 @@ export class MissedCallSmsService {
           await this.mailService.sendEmail(staffEmails, emailSubject, emailBody);
         }
 
-        if (store?.staffContacts?.length) {
-          store.staffContacts.forEach((contact) => {
-            if (contact.mobile) {
-              this.smsProviderService.sendSms(contact.mobile, emailBody);
-            }
-          });
-        }
-
         await this.loggingService.log(LogEventType.BOOKING_CAPTURED, {
           callerNumber: from,
           storeId,
@@ -1016,11 +1008,6 @@ export class MissedCallSmsService {
           emailSubject,
           emailBody,
         );
-      }
-      for (const contact of store?.staffContacts || []) {
-        if (contact.mobile) {
-          await this.smsProviderService.sendSms(contact.mobile, staffMessage);
-        }
       }
     } catch (err: any) {
       this.logger.error(

@@ -602,9 +602,9 @@ describe('MissedCallSmsService - buildOpeningSms', () => {
         ),
         expect.any(String),
       );
-      expect(mockSmsProviderService.sendSms).toHaveBeenCalledWith(
+      expect(mockSmsProviderService.sendSms).not.toHaveBeenCalledWith(
         '0499999999',
-        expect.stringContaining('Callback request — Mister Minit TOK H'),
+        expect.anything(),
       );
       expect(res.humanCallbackRequested).toBe(true);
     });
