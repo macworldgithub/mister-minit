@@ -501,4 +501,252 @@ describe('MissedCallSmsService - buildOpeningSms', () => {
       );
     });
   });
+
+  describe('Duplicate Callback Email Suppression', () => {
+    let service: MissedCallSmsService;
+    let mockStoreConfigService: any;
+    let mockSmsThreadsService: any;
+    let mockOptOutService: any;
+    let mockSuppressedEventsService: any;
+    let mockLoggingService: any;
+    let mockChatbotService: any;
+    let mockSmsProviderService: any;
+    let mockMailService: any;
+    let mockConfigService: any;
+
+    const mockStore: any = {
+      _id: 'store-tok-h',
+      storeName: 'TOK H',
+      staffContacts: [
+        { name: 'Manager', email: 'manager@tokh.com', mobile: '0499999999' },
+      ],
+    };
+
+    beforeEach(() => {
+      mockStoreConfigService = {
+        getStoreById: jest.fn().mockResolvedValue(mockStore),
+        getStoreByDid: jest.fn().mockResolvedValue(mockStore),
+      };
+      mockOptOutService = {
+        isOptedOut: jest.fn().mockResolvedValue(false),
+      };
+      mockSuppressedEventsService = {
+        suppress: jest.fn().mockResolvedValue(true),
+      };
+      mockLoggingService = {
+        log: jest.fn().mockResolvedValue(true),
+      };
+      mockSmsProviderService = {
+        sendSms: jest.fn().mockResolvedValue({ success: true }),
+      };
+      mockMailService = {
+        sendEmail: jest.fn().mockResolvedValue(true),
+      };
+      mockConfigService = {
+        get: jest.fn().mockReturnValue('true'),
+      };
+    });
+
+    it('should send email and staff SMS on the first affirmative callback request', async () => {
+      const activeThread: any = {
+        _id: 'thread-1',
+        callerNumber: '0412938090',
+        storeId: 'store-tok-h',
+        status: 'open',
+        callbackRequested: false,
+        conversationHistory: [
+          {
+            role: 'assistant',
+            content:
+              'Would you like one of our store team members to call you back? Reply Y or N',
+          },
+        ],
+        messageCount: 1,
+      };
+
+      mockSmsThreadsService = {
+        findActiveThread: jest.fn().mockResolvedValue(activeThread),
+        findMostRecentByCallerNumber: jest.fn().mockResolvedValue(activeThread),
+        findThreadById: jest.fn().mockResolvedValue(activeThread),
+        appendToHistory: jest.fn().mockResolvedValue(true),
+        setCustomerReplied: jest.fn().mockResolvedValue(true),
+        setCallbackRequested: jest.fn().mockResolvedValue(true),
+        incrementMessageCount: jest.fn().mockResolvedValue(true),
+      };
+
+      service = new MissedCallSmsService(
+        mockStoreConfigService,
+        mockSmsThreadsService,
+        mockOptOutService,
+        mockSuppressedEventsService,
+        mockLoggingService,
+        {} as any,
+        mockSmsProviderService,
+        {} as any,
+        mockMailService,
+        mockConfigService,
+      );
+
+      const res = await service.handleInboundSms({
+        from: '0412938090',
+        to: '0400000000',
+        body: 'Yes please',
+        receivedAt: new Date().toISOString(),
+      });
+
+      expect(mockMailService.sendEmail).toHaveBeenCalledTimes(1);
+      expect(mockMailService.sendEmail).toHaveBeenCalledWith(
+        ['manager@tokh.com'],
+        expect.stringContaining(
+          'Callback Request — Mister Minit TOK H (0412938090)',
+        ),
+        expect.any(String),
+      );
+      expect(mockSmsProviderService.sendSms).toHaveBeenCalledWith(
+        '0499999999',
+        expect.stringContaining('Callback request — Mister Minit TOK H'),
+      );
+      expect(res.humanCallbackRequested).toBe(true);
+    });
+
+    it('should suppress duplicate callback email and staff SMS when caller replies "Yes please" again on the same thread', async () => {
+      const activeThreadAlreadyNotified: any = {
+        _id: 'thread-1',
+        callerNumber: '0412938090',
+        storeId: 'store-tok-h',
+        status: 'open',
+        callbackRequested: true,
+        conversationHistory: [
+          {
+            role: 'assistant',
+            content:
+              'Would you like one of our store team members to call you back? Reply Y or N',
+          },
+          {
+            role: 'user',
+            content: 'Yes please',
+          },
+          {
+            role: 'assistant',
+            content:
+              "Thanks! I've notified the team at Mister Minit TOK H — you'll receive a call back soon.",
+          },
+        ],
+        messageCount: 3,
+      };
+
+      mockSmsThreadsService = {
+        findActiveThread: jest.fn().mockResolvedValue(activeThreadAlreadyNotified),
+        findMostRecentByCallerNumber: jest.fn().mockResolvedValue(activeThreadAlreadyNotified),
+        findThreadById: jest.fn().mockResolvedValue(activeThreadAlreadyNotified),
+        appendToHistory: jest.fn().mockResolvedValue(true),
+        setCustomerReplied: jest.fn().mockResolvedValue(true),
+        setCallbackRequested: jest.fn().mockResolvedValue(true),
+        saveBooking: jest.fn().mockResolvedValue(true),
+        incrementMessageCount: jest.fn().mockResolvedValue(true),
+      };
+
+      service = new MissedCallSmsService(
+        mockStoreConfigService,
+        mockSmsThreadsService,
+        mockOptOutService,
+        mockSuppressedEventsService,
+        mockLoggingService,
+        {} as any,
+        mockSmsProviderService,
+        {} as any,
+        mockMailService,
+        mockConfigService,
+      );
+
+      const res = await service.handleInboundSms({
+        from: '0412938090',
+        to: '0400000000',
+        body: 'Yes please',
+        receivedAt: new Date().toISOString(),
+      });
+
+      // Mail and staff SMS must NOT be sent again
+      expect(mockMailService.sendEmail).not.toHaveBeenCalled();
+      expect(mockSmsProviderService.sendSms).not.toHaveBeenCalledWith(
+        '0499999999',
+        expect.anything(),
+      );
+      // Customer gets reassurance instead
+      expect(res.replyText).toContain('already notified the team at Mister Minit TOK H');
+      expect(res.humanCallbackRequested).toBe(false);
+    });
+
+    it('should still send booking notification email if a booking is completed after an initial callback', async () => {
+      const activeThreadAlreadyNotified: any = {
+        _id: 'thread-1',
+        callerNumber: '0412938090',
+        storeId: 'store-tok-h',
+        status: 'open',
+        callbackRequested: true,
+        conversationHistory: [
+          {
+            role: 'assistant',
+            content:
+              "Thanks! I've notified the team at Mister Minit TOK H — you'll receive a call back soon.",
+          },
+        ],
+        messageCount: 3,
+      };
+
+      mockSmsThreadsService = {
+        findActiveThread: jest.fn().mockResolvedValue(activeThreadAlreadyNotified),
+        findMostRecentByCallerNumber: jest.fn().mockResolvedValue(activeThreadAlreadyNotified),
+        findThreadById: jest.fn().mockResolvedValue(activeThreadAlreadyNotified),
+        appendToHistory: jest.fn().mockResolvedValue(true),
+        setCustomerReplied: jest.fn().mockResolvedValue(true),
+        setCallbackRequested: jest.fn().mockResolvedValue(true),
+        saveBooking: jest.fn().mockResolvedValue(true),
+        incrementMessageCount: jest.fn().mockResolvedValue(true),
+      };
+
+      mockChatbotService = {
+        handleMessage: jest.fn().mockResolvedValue({
+          replyText:
+            'Great, I have booked you in for shoe repair tomorrow at 10am!',
+          bookingIntentDetected: true,
+          bookingDetails: {
+            customerName: 'Alex',
+            serviceType: 'shoe repair',
+            preferredTime: 'tomorrow at 10am',
+          },
+          humanCallbackRequested: false,
+          optOut: false,
+        }),
+      };
+
+      service = new MissedCallSmsService(
+        mockStoreConfigService,
+        mockSmsThreadsService,
+        mockOptOutService,
+        mockSuppressedEventsService,
+        mockLoggingService,
+        mockChatbotService,
+        mockSmsProviderService,
+        {} as any,
+        mockMailService,
+        mockConfigService,
+      );
+
+      await service.handleInboundSms({
+        from: '0412938090',
+        to: '0400000000',
+        body: 'Actually can I just book a shoe repair tomorrow at 10am, name Alex',
+        receivedAt: new Date().toISOString(),
+      });
+
+      // Booking email SHOULD be dispatched
+      expect(mockMailService.sendEmail).toHaveBeenCalledTimes(1);
+      expect(mockMailService.sendEmail).toHaveBeenCalledWith(
+        ['manager@tokh.com'],
+        expect.stringContaining('New Booking Request — Mister Minit TOK H'),
+        expect.stringContaining('shoe repair'),
+      );
+    });
+  });
 });

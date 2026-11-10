@@ -414,6 +414,7 @@ export class MissedCallSmsService {
         store,
         replyText: null,
         source: 'affirmative_fast_path',
+        alreadyNotified: recentThread.callbackRequested === true,
       });
     }
 
@@ -426,6 +427,7 @@ export class MissedCallSmsService {
         newInboundMessage: body,
         messageCount: recentThread.messageCount,
         missedCallId: (recentThread as any)._id,
+        callbackRequested: recentThread.callbackRequested === true,
       });
 
       // ── Step 6: Handle chatbot response ───────────────────────────────────
@@ -473,6 +475,7 @@ export class MissedCallSmsService {
           replyText: chatbotResponse.replyText,
           source: 'llm_detected',
           chatbotResponse,
+          alreadyNotified: recentThread.callbackRequested === true,
         });
       }
 
@@ -815,7 +818,9 @@ export class MissedCallSmsService {
     if (!history?.length) return false;
     for (let i = history.length - 1; i >= 0; i--) {
       if (history[i].role === 'assistant') {
-        return /call you back/i.test(history[i].content || '');
+        return /call you back|callback request|call back/i.test(
+          history[i].content || '',
+        );
       }
     }
     return false;
@@ -866,17 +871,33 @@ export class MissedCallSmsService {
     replyText: string | null;
     source: string;
     chatbotResponse?: any;
+    alreadyNotified?: boolean;
   }): Promise<any> {
     const { from, body, threadId, storeId, store, source } = params;
     const storeName = store?.storeName ?? '';
 
-    // Use the LLM wording only when it clearly confirms a call back
-    // (e.g. it also answered a question); otherwise the fixed confirmation.
+    const alreadyNotified =
+      params.alreadyNotified ??
+      (await this.smsThreadsService.findThreadById(threadId))?.callbackRequested === true;
+
+    // Use the LLM wording only when it clearly confirms/reassures a call back
+    // (e.g. it also answered a question); otherwise fixed confirmation/reassurance.
     const llmReply = (params.replyText || '').trim();
-    const replyText =
-      llmReply && /call/i.test(llmReply)
-        ? llmReply
-        : this.buildCallbackConfirmation(store);
+    let replyText: string;
+
+    if (alreadyNotified) {
+      replyText =
+        llmReply &&
+        !/notified the team|let the team know/i.test(llmReply) &&
+        !/reach out soon/i.test(llmReply)
+          ? llmReply
+          : this.buildDuplicateCallbackReassurance(store);
+    } else {
+      replyText =
+        llmReply && /call/i.test(llmReply)
+          ? llmReply
+          : this.buildCallbackConfirmation(store);
+    }
 
     await this.smsThreadsService.setCallbackRequested(threadId);
     await this.sendWithRetry(from, replyText, MAX_SMS_RETRIES);
@@ -887,7 +908,27 @@ export class MissedCallSmsService {
     });
     await this.smsThreadsService.incrementMessageCount(threadId);
 
-    // Notify store staff (SMS + email)
+    // If staff was already notified previously in this thread, suppress duplicate email & staff SMS.
+    if (alreadyNotified) {
+      this.logger.log(
+        `[CALLBACK REQUEST] Suppressed duplicate staff notification for thread ${threadId} (caller ${from}) — staff was already notified.`,
+      );
+      await this.loggingService.log(LogEventType.CALLBACK_REQUESTED, {
+        callerNumber: from,
+        storeId,
+        storeName,
+        threadId,
+        metadata: { inboundBody: body, source, duplicateSuppressed: true },
+      });
+      return {
+        ...(params.chatbotResponse || {}),
+        replyText,
+        humanCallbackRequested: false,
+        threadId,
+      };
+    }
+
+    // Notify store staff (SMS + email) — only on the initial callback request
     const emailSubject = `Callback Request — ${this.formatStoreDisplayName(store)} (${from})`;
     const emailBody = this.buildCallbackEmailNotification(store, from, body);
     const staffMessage = this.buildCallbackStaffNotification(store, from);
@@ -1117,6 +1158,14 @@ export class MissedCallSmsService {
     return (
       `Thanks! I've notified the team at ${displayName} — you'll receive a call back soon. ` +
       `In the meantime, feel free to message me if you have any questions.`
+    );
+  }
+
+  public buildDuplicateCallbackReassurance(store: StoreConfig | null): string {
+    const displayName = this.formatStoreDisplayName(store);
+    return (
+      `We've already notified the team at ${displayName} about your callback request, and someone will be in touch shortly! ` +
+      `In the meantime, feel free to message if you'd like to book a specific service or have any questions.`
     );
   }
 

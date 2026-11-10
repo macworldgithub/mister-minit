@@ -183,6 +183,12 @@ Do NOT set it true when the customer says NO / not needed / "I'm fine", or when 
 If the customer says YES but ALSO asks a question in the same message, set humanCallbackRequested true AND answer the question briefly in replyText.
 When humanCallbackRequested is true, replyText should be a short confirmation that the store team has been notified and will call them back soon (the system may replace it with a fixed message).
 
+{{CALLBACK_STATUS_DIRECTIVE}}
+- If the conversation history already shows the assistant confirmed a callback, or if a callback has already been dispatched:
+  - Do NOT set humanCallbackRequested to true again for repeated simple affirmatives ("yes", "yes please", "sure", "ok", "call me"). Set humanCallbackRequested to false.
+  - Reassure the customer that the team at {{STORE_NAME}} already has their callback request and will call them as soon as possible.
+  - If the customer wants to book an appointment (e.g. specifies day/time/service), capture their booking details (name, preferred time, service) and set bookingIntentDetected to true.
+
 ### WHAT IS NEVER ALLOWED FOR CAR KEYS
 
 For car key topics, you must NEVER in your first reply:
@@ -1027,6 +1033,7 @@ export class ChatbotService {
     newInboundMessage: string;
     messageCount: number;
     missedCallId: any;
+    callbackRequested?: boolean;
   }): Promise<ChatbotResponse> {
     const { callerNumber, storeRecord, conversationHistory, newInboundMessage } = params;
 
@@ -1068,6 +1075,18 @@ export class ChatbotService {
         /\{\{HOLIDAY_STATUS_DIRECTIVE\}\}/g,
         this.buildHolidayDirective(currentDateStr, todayHoliday),
       );
+
+    const callbackDirective = params.callbackRequested
+      ? `\n### CALLBACK ALREADY DISPATCHED\n` +
+        `A staff callback has ALREADY been dispatched to the store team for this customer.\n` +
+        `- Do NOT set humanCallbackRequested to true again for repeated simple affirmatives ("yes", "yes please", "sure", "ok", "call me"). Set humanCallbackRequested to false.\n` +
+        `- Reassure the customer that the store team has already received their callback request and will call them soon.\n` +
+        `- If the customer wants to book an appointment (e.g. specifies day/time/service), capture their booking details (name, preferred time, service) and set bookingIntentDetected to true.\n`
+      : '';
+    dynamicSystemPrompt = dynamicSystemPrompt.replace(
+      /\{\{CALLBACK_STATUS_DIRECTIVE\}\}/g,
+      callbackDirective,
+    );
 
     // Reconstruct history in OpenAI format
     const history: ChatMessage[] = [
