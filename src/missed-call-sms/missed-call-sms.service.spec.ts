@@ -589,9 +589,7 @@ describe('MissedCallSmsService - buildOpeningSms', () => {
 
       const res = await service.handleInboundSms({
         from: '0412938090',
-        to: '0400000000',
         body: 'Yes please',
-        receivedAt: new Date().toISOString(),
       });
 
       expect(mockMailService.sendEmail).toHaveBeenCalledTimes(1);
@@ -661,9 +659,7 @@ describe('MissedCallSmsService - buildOpeningSms', () => {
 
       const res = await service.handleInboundSms({
         from: '0412938090',
-        to: '0400000000',
         body: 'Yes please',
-        receivedAt: new Date().toISOString(),
       });
 
       // Mail and staff SMS must NOT be sent again
@@ -735,9 +731,7 @@ describe('MissedCallSmsService - buildOpeningSms', () => {
 
       await service.handleInboundSms({
         from: '0412938090',
-        to: '0400000000',
         body: 'Actually can I just book a shoe repair tomorrow at 10am, name Alex',
-        receivedAt: new Date().toISOString(),
       });
 
       // Booking email SHOULD be dispatched
@@ -812,9 +806,7 @@ describe('MissedCallSmsService - buildOpeningSms', () => {
 
       const res = await service.handleInboundSms({
         from: '0412938090',
-        to: '0400000000',
         body: 'Yes please',
-        receivedAt: new Date().toISOString(),
       });
 
       // No email & no staff SMS
@@ -877,9 +869,7 @@ describe('MissedCallSmsService - buildOpeningSms', () => {
 
       const res = await service.handleInboundSms({
         from: '0412938090',
-        to: '0400000000',
         body: 'Yes please',
-        receivedAt: new Date().toISOString(),
       });
 
       // Completely discarded without sending any SMS

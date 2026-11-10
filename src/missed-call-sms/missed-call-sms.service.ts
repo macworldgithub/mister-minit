@@ -51,6 +51,8 @@ interface CdrDocument {
 export interface InboundSmsPayload {
   from: string;
   body: string;
+  to?: string;
+  receivedAt?: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
