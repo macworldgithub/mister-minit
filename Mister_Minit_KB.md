@@ -415,7 +415,7 @@ Toyota, Hyundai, Ford, Mazda, Subaru, Honda, Nissan, Volkswagen, Commodore / Hol
 ```text
 BOOKING REQUEST — {{STORE_NAME}}
 Customer: [NAME if provided]
-Mobile: [CALLER NUMBER]
+Mobile: {{CALLER_NUMBER}}
 Service: [SERVICE TYPE]
 Preferred: [DAY/TIME]
 Conversation summary: [BRIEF SUMMARY]
@@ -444,7 +444,7 @@ Conversation summary: [BRIEF SUMMARY]
 - Conversation is confusing or the agent cannot resolve the question.
 
 **Customer-facing escalation message**
-> "I want to make sure you get the right help here — I'll flag this for the team at {{STORE_NAME}} to call you back. Is [CALLBACK NUMBER] the best number for them to reach you on?"
+> "I want to make sure you get the right help here — I'll flag this for the team at {{STORE_NAME}} to call you back on {{CALLER_NUMBER}}. If you prefer a different number, just let me know!"
 
 ## 17. CALL-VOLUME INSIGHTS
 *These are operational observations, not customer-facing claims unless relevant to the business workflow.*

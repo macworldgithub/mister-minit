@@ -43,6 +43,21 @@ export function getAustralianTodayDate(): {
   return { isoDate, formatted, holidayName };
 }
 
+export function formatAustralianPhone(phone: string): string {
+  if (!phone) return '';
+  const clean = phone.replace(/[^\d+]/g, '');
+  if (clean.startsWith('+614') && clean.length === 12) {
+    return `0${clean.slice(3, 6)} ${clean.slice(6, 9)} ${clean.slice(9)}`;
+  }
+  if (clean.startsWith('614') && clean.length === 11) {
+    return `0${clean.slice(2, 5)} ${clean.slice(5, 8)} ${clean.slice(8)}`;
+  }
+  if (clean.startsWith('04') && clean.length === 10) {
+    return `${clean.slice(0, 4)} ${clean.slice(4, 7)} ${clean.slice(7)}`;
+  }
+  return phone;
+}
+
 export const SYSTEM_PROMPT = `
 ### IDENTITY & ROLE
 
@@ -181,7 +196,7 @@ Set humanCallbackRequested to true when the customer wants a team member to call
 Use the conversation history: a short affirmative only counts when the most recent assistant message offered a callback (or the customer clearly asks for a person).
 Do NOT set it true when the customer says NO / not needed / "I'm fine", or when they simply ask a question (price, hours, address) — in that case answer normally with humanCallbackRequested false.
 If the customer says YES but ALSO asks a question in the same message, set humanCallbackRequested true AND answer the question briefly in replyText.
-When humanCallbackRequested is true, replyText should be a short confirmation that the store team has been notified and will call them back soon (the system may replace it with a fixed message).
+When humanCallbackRequested is true, replyText should be a short confirmation that the store team has been notified and will call them back on {{CALLER_NUMBER}} soon (the system may replace it with a fixed message).
 
 {{CALLBACK_STATUS_DIRECTIVE}}
 - If the conversation history already shows the assistant confirmed a callback, or if a callback has already been dispatched:
@@ -702,7 +717,7 @@ Toyota, Hyundai, Ford, Mazda, Subaru, Honda, Nissan, Volkswagen, Commodore / Hol
 \`\`\`text
 BOOKING REQUEST — {{STORE_NAME}}
 Customer: [NAME if provided]
-Mobile: [CALLER NUMBER]
+Mobile: {{CALLER_NUMBER}}
 Service: [SERVICE TYPE]
 Preferred: [DAY/TIME]
 Conversation summary: [BRIEF SUMMARY]
@@ -731,7 +746,7 @@ Conversation summary: [BRIEF SUMMARY]
 - Conversation is confusing or the agent cannot resolve the question.
 
 **Customer-facing escalation message**
-> "I want to make sure you get the right help here — I'll flag this for the team at {{STORE_NAME}} to call you back. Is [CALLBACK NUMBER] the best number for them to reach you on?"
+> "I want to make sure you get the right help here — I'll flag this for the team at {{STORE_NAME}} to call you back on {{CALLER_NUMBER}}. If you prefer a different number, just let me know!"
 
 ### 16. CALL-VOLUME INSIGHTS
 *These are operational observations, not customer-facing claims unless relevant to the business workflow.*
@@ -869,9 +884,23 @@ export class ChatbotService {
         .replace(/\{\{ACTION_NOTES\}\}/g, '')
         .replace(/\{\{BOOKING_LINK\}\}/g, '');
     }
+    const formattedCaller = formatAustralianPhone(from);
+    dynamicSystemPrompt = dynamicSystemPrompt
+      .replace(/\{\{CALLER_NUMBER\}\}/g, formattedCaller)
+      .replace(/\{\{CALLBACK_NUMBER\}\}/g, formattedCaller)
+      .replace(/\[CALLBACK NUMBER\]/gi, formattedCaller)
+      .replace(/\[CALLER NUMBER\]/gi, formattedCaller);
+
+    const dynamicKnowledgeBase = KNOWLEDGE_BASE
+      .replace(/\{\{STORE_NAME\}\}/g, store?.storeName ?? storeName)
+      .replace(/\{\{CALLER_NUMBER\}\}/g, formattedCaller)
+      .replace(/\{\{CALLBACK_NUMBER\}\}/g, formattedCaller)
+      .replace(/\[CALLBACK NUMBER\]/gi, formattedCaller)
+      .replace(/\[CALLER NUMBER\]/gi, formattedCaller);
+
     const systemMessage: ChatMessage = {
       role: 'system',
-      content: `${dynamicSystemPrompt}\n\nKNOWLEDGE BASE:\n${KNOWLEDGE_BASE}`,
+      content: `${dynamicSystemPrompt}\n\nKNOWLEDGE BASE:\n${dynamicKnowledgeBase}`,
     };
 
     const initialGreeting = `Hi, sorry we missed your call to Mister Minit ${storeName}! How can we help you today?\n\nWebsite: https://misterminit.co\nReply STOP to opt out.`;
@@ -934,9 +963,23 @@ export class ChatbotService {
           this.buildHolidayDirective(currentDateStr, todayHoliday),
         );
 
+      const formattedCaller = formatAustralianPhone(from);
+      dynamicSystemPrompt = dynamicSystemPrompt
+        .replace(/\{\{CALLER_NUMBER\}\}/g, formattedCaller)
+        .replace(/\{\{CALLBACK_NUMBER\}\}/g, formattedCaller)
+        .replace(/\[CALLBACK NUMBER\]/gi, formattedCaller)
+        .replace(/\[CALLER NUMBER\]/gi, formattedCaller);
+
+      const dynamicKnowledgeBase = KNOWLEDGE_BASE
+        .replace(/\{\{STORE_NAME\}\}/g, store?.storeName ?? 'Store')
+        .replace(/\{\{CALLER_NUMBER\}\}/g, formattedCaller)
+        .replace(/\{\{CALLBACK_NUMBER\}\}/g, formattedCaller)
+        .replace(/\[CALLBACK NUMBER\]/gi, formattedCaller)
+        .replace(/\[CALLER NUMBER\]/gi, formattedCaller);
+
       const systemMessage: ChatMessage = {
         role: 'system',
-        content: `${dynamicSystemPrompt}\n\nKNOWLEDGE BASE:\n${KNOWLEDGE_BASE}`,
+        content: `${dynamicSystemPrompt}\n\nKNOWLEDGE BASE:\n${dynamicKnowledgeBase}`,
       };
       history = [systemMessage];
     }
@@ -1088,11 +1131,25 @@ export class ChatbotService {
       callbackDirective,
     );
 
+    const formattedCaller = formatAustralianPhone(callerNumber);
+    dynamicSystemPrompt = dynamicSystemPrompt
+      .replace(/\{\{CALLER_NUMBER\}\}/g, formattedCaller)
+      .replace(/\{\{CALLBACK_NUMBER\}\}/g, formattedCaller)
+      .replace(/\[CALLBACK NUMBER\]/gi, formattedCaller)
+      .replace(/\[CALLER NUMBER\]/gi, formattedCaller);
+
+    const dynamicKnowledgeBase = KNOWLEDGE_BASE
+      .replace(/\{\{STORE_NAME\}\}/g, storeRecord?.storeName ?? 'Store')
+      .replace(/\{\{CALLER_NUMBER\}\}/g, formattedCaller)
+      .replace(/\{\{CALLBACK_NUMBER\}\}/g, formattedCaller)
+      .replace(/\[CALLBACK NUMBER\]/gi, formattedCaller)
+      .replace(/\[CALLER NUMBER\]/gi, formattedCaller);
+
     // Reconstruct history in OpenAI format
     const history: ChatMessage[] = [
       {
         role: 'system',
-        content: `${dynamicSystemPrompt}\n\nKNOWLEDGE BASE:\n${KNOWLEDGE_BASE}`,
+        content: `${dynamicSystemPrompt}\n\nKNOWLEDGE BASE:\n${dynamicKnowledgeBase}`,
       },
       ...conversationHistory.map((m) => ({
         role: m.role,
@@ -1129,7 +1186,15 @@ export class ChatbotService {
       };
     }
 
-    return this.parseResponse(rawReply, storeRecord?.did ?? '');
+    const response = this.parseResponse(rawReply, storeRecord?.did ?? '');
+    if (response.replyText) {
+      response.replyText = response.replyText
+        .replace(/\[CALLBACK NUMBER\]/gi, formattedCaller)
+        .replace(/\[CALLER NUMBER\]/gi, formattedCaller)
+        .replace(/\{\{CALLER_NUMBER\}\}/g, formattedCaller)
+        .replace(/\{\{CALLBACK_NUMBER\}\}/g, formattedCaller);
+    }
+    return response;
   }
 
   private parseResponse(raw: string, storeDid: string): ChatbotResponse {

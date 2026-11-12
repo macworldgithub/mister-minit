@@ -1,4 +1,4 @@
-import { SYSTEM_PROMPT } from './chatbot.service';
+import { SYSTEM_PROMPT, formatAustralianPhone } from './chatbot.service';
 
 describe('ChatbotService - SYSTEM_PROMPT Rules', () => {
   it('should enforce emergency triage at the front of the car key flow', () => {
@@ -40,5 +40,14 @@ describe('ChatbotService - SYSTEM_PROMPT Rules', () => {
     expect(SYSTEM_PROMPT).toContain('Boxing Day — 26 December 2026 (Saturday)');
     expect(SYSTEM_PROMPT).toContain('Additional Boxing Day Public Holiday — 28 December 2026 (Monday)');
     expect(SYSTEM_PROMPT).toContain('No, we are closed due to [Holiday Name]');
+  });
+});
+
+describe('formatAustralianPhone', () => {
+  it('should format Australian mobiles into readable 04XX XXX XXX format', () => {
+    expect(formatAustralianPhone('0450347495')).toBe('0450 347 495');
+    expect(formatAustralianPhone('61450347495')).toBe('0450 347 495');
+    expect(formatAustralianPhone('+61450347495')).toBe('0450 347 495');
+    expect(formatAustralianPhone('0450 347 495')).toBe('0450 347 495');
   });
 });

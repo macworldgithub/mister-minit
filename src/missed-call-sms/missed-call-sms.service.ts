@@ -16,7 +16,7 @@ import {
 import { SuppressedReason } from '../suppressed-events/suppressed-event.schema';
 import { LoggingService } from '../logging/logging.service';
 import { LogEventType } from '../logging/log.schema';
-import { ChatbotService } from '../chatbot/chatbot.service';
+import { ChatbotService, formatAustralianPhone } from '../chatbot/chatbot.service';
 import { SmsProviderService } from './sms-provider.service';
 import { MailService } from '../mail/mail.service';
 import { getMissedCallRule } from '../cdr/cdr-call-outcome.util';
@@ -930,7 +930,16 @@ export class MissedCallSmsService {
       replyText =
         llmReply && /call/i.test(llmReply)
           ? llmReply
-          : this.buildCallbackConfirmation(store);
+          : this.buildCallbackConfirmation(store, from);
+    }
+
+    const formattedCaller = formatAustralianPhone(from);
+    if (replyText) {
+      replyText = replyText
+        .replace(/\[CALLBACK NUMBER\]/gi, formattedCaller)
+        .replace(/\[CALLER NUMBER\]/gi, formattedCaller)
+        .replace(/\{\{CALLER_NUMBER\}\}/g, formattedCaller)
+        .replace(/\{\{CALLBACK_NUMBER\}\}/g, formattedCaller);
     }
 
     await this.smsThreadsService.setCallbackRequested(threadId);
@@ -1073,9 +1082,15 @@ export class MissedCallSmsService {
       );
       return false;
     }
+    const formattedTo = formatAustralianPhone(to);
+    const sanitizedBody = (body || '')
+      .replace(/\[CALLBACK NUMBER\]/gi, formattedTo)
+      .replace(/\[CALLER NUMBER\]/gi, formattedTo)
+      .replace(/\{\{CALLER_NUMBER\}\}/g, formattedTo)
+      .replace(/\{\{CALLBACK_NUMBER\}\}/g, formattedTo);
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const ok = await this.smsProviderService.sendSms(to, body);
+        const ok = await this.smsProviderService.sendSms(to, sanitizedBody);
         if (ok) return true;
       } catch (err: any) {
         this.logger.warn(
@@ -1215,10 +1230,16 @@ export class MissedCallSmsService {
     ].join('\n');
   }
 
-  public buildCallbackConfirmation(store: StoreConfig | null): string {
+  public buildCallbackConfirmation(
+    store: StoreConfig | null,
+    callerNumber?: string,
+  ): string {
     const displayName = this.formatStoreDisplayName(store);
+    const onNumber = callerNumber
+      ? ` on ${formatAustralianPhone(callerNumber)}`
+      : '';
     return (
-      `Thanks! I've notified the team at ${displayName} — you'll receive a call back soon. ` +
+      `Thanks! I've notified the team at ${displayName} — you'll receive a call back${onNumber} soon. ` +
       `In the meantime, feel free to message me if you have any questions.`
     );
   }
